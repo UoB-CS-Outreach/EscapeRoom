@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Root Cause Answer Key</title>
+<style>
+:root{--bg:#F3F5F8;--surface:#fff;--ink:#161C27;--muted:#586275;--line:#D3D9E3;--accent:#2F4BD8}
+@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#0E121A;--surface:#151B26;--ink:#E4E8F0;--muted:#97A1B3;--line:#2A3345;--accent:#8196FF}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:780px;margin:0 auto;padding:2rem 16px 3rem}
+h1{font-size:1.9rem;margin:0 0 .25rem}
+.note{color:var(--muted);margin:0 0 1.5rem}
+section{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:1rem 1.25rem;margin-bottom:.75rem;break-inside:avoid}
+h2{font-size:1.1rem;margin:0 0 .4rem;color:var(--accent)}
+p{margin:.35rem 0}ol{margin:.35rem 0;padding-left:1.4rem}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+</style></head><body><main>
+<h1>Root Cause answer key</h1>
+<p class="note">For facilitators only. Keep this file off the public GitHub repo.</p>
+<section><h2>Stage 1 · Initial access</h2><p>Suspicious: <b>IT Service Desk</b> (mailbox storage) and <b>DelivR Parcels</b>. The other five are genuine.</p><p>Email that gave away the password: <b>IT Service Desk</b>.</p><p>Clues: lookalike domain; link goes somewhere other than the address shown; two-hour deadline; "Dear user". <i>Not</i> clues: spelling mistakes, logo, attachment, time sent.</p></section>
+<section><h2>Stage 2 · Sign-in trail</h2><p>Account <b class="mono">d.okafor</b> · IP <b class="mono">203.0.113.77</b> · first success <b class="mono">08:03:41</b> · MFA bypass: <b>kept triggering approval prompts</b> (MFA fatigue).</p><p>The Frankfurt burst at 07:15 is an unrelated, failed password spray.</p></section>
+<section><h2>Stage 3 · Timeline</h2><ol><li>Frankfurt password spray fails</li><li>Phishing email arrives</li><li>Dan enters his password</li><li>First three MFA prompts denied</li><li>Attacker signs in as Dan</li><li>Hidden mailbox rule created</li><li>svc_kestrel created</li><li>Northfield Pallets' bank details changed</li></ol><p>Dwell time: <b>59 minutes</b> (08:03 to 09:02).</p></section>
+<section><h2>Stage 4 · The attacker's notes</h2><p>Note 1: decode Base64, then shift back by <b>11</b>. Backup account: <b class="mono">svc_kestrel</b> (<span class="mono">kestrel</span> also accepted).</p><p>Note 2: Vigenère keyword <b class="mono">NORTHFIELD</b>. Next target: <b>Moorside Fuels</b>.</p></section>
+<section><h2>Stage 5 · How it was possible</h2><p>Flawed lines: <b>7, 11 and 18</b>.</p><p>Fixes: line 7, salted hash with <span class="mono">verify_hash</span>; line 11, limit prompts and use number matching; line 18, check the role stored on the server.</p></section>
+<section><h2>Stage 6 · Password vault</h2><p>Part 1: "roughly half the characters change"; "identical passwords no longer produce identical hashes".</p><p>Part 2: <b class="mono">j.mercer</b> and <b class="mono">t.hughes</b>.</p><p>Part 3, weakest to strongest: Password1 (1), Tr4ct0r! (2), Bl4ck-Sh33p (3), kettle-violin-harbour-42 (4).</p></section>
+<section><h2>Stage 7 · Close the door</h2><p>One working rule set, top to bottom:</p><ol><li>Deny 203.0.113.77, any port</li><li>Deny 198.51.100.23, any port</li><li>Allow any address, port 443</li><li>Allow 81.2.69.0/24, port 22</li><li>Rule off</li></ol><p>Question: <b>the attacker can switch IP address</b>.</p></section>
+<section><h2>Stage 8 · Catch it next time</h2><p>Train, then set the threshold to roughly <b>13–27%</b> (all 8 attacks caught, at most 2 false alarms).</p><p>Answers: the attack with <b>only 3 failed steps</b>; at 1%, <b>every attack is caught but analysts are flooded with false alarms</b>.</p></section>
+<section><h2>Stage 9 · Respond</h2><p><b>Now:</b> disable svc_kestrel; sign Dan out and reset his password; delete the mailbox rule; call the bank and warn Moorside Fuels; block the attacker IPs.</p><p><b>This week:</b> release the code fixes; MFA number matching; review a month of bank-detail changes.</p><p><b>Longer term:</b> phishing training; phone-call rule for bank changes; switch on the detection model.</p><p><b>Don't do this:</b> formal warning for Dan; deleting the logs.</p></section>
+</main></body></html>
