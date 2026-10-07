@@ -17,6 +17,10 @@ p{margin:.35rem 0}ol{margin:.35rem 0;padding-left:1.4rem}
 </style></head><body><main>
 <h1>Root Cause answer key</h1>
 <p class="note">For facilitators only. Keep this file off the public GitHub repo.</p>
+<section><h2>Express version (5 stages)</h2>
+<p>The Express version uses five of the nine stages below, with the same answers:</p>
+<ol><li>Express stage 1 = Stage 1 · Initial access</li><li>Express stage 2 = Stage 2 · Sign-in trail</li><li>Express stage 3 = Stage 4 · The attacker's notes (<b>note 1 only</b>: answer <span class="mono">svc_kestrel</span>)</li><li>Express stage 4 = Stage 5 · How it was possible</li><li>Express stage 5 = Stage 8 · Catch it next time</li></ol>
+</section>
 <section><h2>Stage 1 · Initial access</h2><p>Suspicious: <b>IT Service Desk</b> (mailbox storage) and <b>DelivR Parcels</b>. The other five are genuine.</p><p>Email that gave away the password: <b>IT Service Desk</b>.</p><p>Clues: lookalike domain; link goes somewhere other than the address shown; two-hour deadline; "Dear user". <i>Not</i> clues: spelling mistakes, logo, attachment, time sent.</p></section>
 <section><h2>Stage 2 · Sign-in trail</h2><p>Account <b class="mono">d.okafor</b> · IP <b class="mono">203.0.113.77</b> · first success <b class="mono">08:03:41</b> · MFA bypass: <b>kept triggering approval prompts</b> (MFA fatigue).</p><p>The Frankfurt burst at 07:15 is an unrelated, failed password spray.</p></section>
 <section><h2>Stage 3 · Timeline</h2><ol><li>Frankfurt password spray fails</li><li>Phishing email arrives</li><li>Dan enters his password</li><li>First three MFA prompts denied</li><li>Attacker signs in as Dan</li><li>Hidden mailbox rule created</li><li>svc_kestrel created</li><li>Northfield Pallets' bank details changed</li></ol><p>Dwell time: <b>59 minutes</b> (08:03 to 09:02).</p></section>

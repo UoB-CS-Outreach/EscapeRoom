@@ -12,7 +12,7 @@
 /* =====================================================================
    ROOT CAUSE: a cyber incident investigation for Year 12/13 students
    Everything runs in the browser. No logins, no data leaves the device.
-   To customise courses/URLs, edit the CONFIG block in the script.
+   To customise for your university, edit the CONFIG block in the script.
    ===================================================================== */
 :root{
   --bg:#F3F5F8; --surface:#FFFFFF; --surface-2:#E9EDF3; --ink:#161C27; --muted:#586275;
@@ -317,7 +317,7 @@ details.prompt p{margin-top:.4rem;font-size:.93rem}
 
 <script>
 /* =====================================================================
-   CONFIG: edit these values for specific courses or for specific sessions.
+   CONFIG: edit these values for your institution and session.
    ===================================================================== */
 const CONFIG = {
   university: "University of Bradford",
@@ -330,7 +330,8 @@ const CONFIG = {
     "BSc Software and Artificial Intelligence Engineering"
   ],
   website: "https://www.bradford.ac.uk/undergraduate/subjects/computing",
-  openDay: "Find open day dates, entry requirements and course details on our website."
+  openDay: "Find open day dates, entry requirements and course details on our website.",
+  variant: "full"               // "full" = 9 stages (~45 min); "short" = 5 stages (~25 min)
 };
 
 /* ---------- small helpers ---------- */
@@ -345,7 +346,7 @@ const store = {
 };
 
 /* ---------- stage definitions ---------- */
-const STAGES = [
+const ALL_STAGES = [
   { id:"s1", title:"Initial access", sub:"Phishing analysis", topic:"Cyber security",
     hints:[
       "Check the full sender address of every email, not just the display name, and compare it with the company's real domain, tarnvalley.example. Hover over or tap every button to see where it really goes. Two emails are malicious.",
@@ -365,6 +366,10 @@ const STAGES = [
     hints:[
       "Note 1 ends in a pattern typical of Base64. Decode it first. The result is still scrambled, but spaces and punctuation are in place, so each letter has only been shifted. E is the most common English letter: find the tallest blue bar and count how far it is from E.",
       "For note 2, the keyword is one word: the first word of the supplier whose bank details were already changed (see stage 1 or the sign-in log)."
+    ],
+    shortHints:[
+      "The string ends in a pattern typical of Base64. Decode it first. The result is still scrambled, but the spaces and punctuation are in place, so each letter has only been shifted.",
+      "In English, E is the most common letter. Find the tallest blue bar on the frequency chart and work out how far it is from E."
     ]},
   { id:"s5", title:"How it was possible", sub:"Secure code review", topic:"Software development",
     hints:[
@@ -392,10 +397,15 @@ const STAGES = [
       "\"This week\" is for fixing what let the attacker in: the code, the MFA settings and checking for other damage. \"Longer term\" is about people, processes and monitoring."
     ]}
 ];
+const SHORT = CONFIG.variant === "short";
+const PLAN = SHORT ? ["s1","s2","s4","s5","s8"] : ALL_STAGES.map(x=>x.id);
+const STAGES = ALL_STAGES.filter(x=>PLAN.includes(x.id)).map(x=> SHORT && x.shortHints ? {...x, hints:x.shortHints} : x);
+const idx = id => STAGES.findIndex(x=>x.id===id);
+const STORE_KEY = "rootcause.v2." + (SHORT ? "short" : "team");
 
 const BLANK = () => ({ team:"", started:null, finished:null, current:0, stages:STAGES.map(()=>({hints:0,wrong:0,status:"open",score:0})), ui:{} });
-let S = store.get("rootcause.v2.team") || BLANK();
-const save = () => store.set("rootcause.v2.team", S);
+let S = store.get(STORE_KEY) || BLANK();
+const save = () => store.set(STORE_KEY, S);
 
 function stageScore(i){ const st=S.stages[i]; if(st.status==="skipped") return 0; if(st.status!=="done") return 0; return Math.max(40, 100 - 15*st.hints - 10*st.wrong); }
 const totalScore = () => S.stages.reduce((a,_,i)=>a+stageScore(i),0);
@@ -513,7 +523,7 @@ function renderCase(){
     if(b.dataset.go==="report"){ S.ui.view="report"; save(); return render(); }
     S.current = +b.dataset.go; save(); render(); window.scrollTo({top:0});
   });
-  [stage1,stage2,stageTimeline,stage3,stage4,stagePw,stageFw,stage5,stageRespond][i]($("#stage"));
+  ({s1:stage1,s2:stage2,s3:stageTimeline,s4:stage3,s5:stage4,s6:stagePw,s7:stageFw,s8:stage5,s9:stageRespond})[STAGES[i].id]($("#stage"));
 }
 
 function stageFrame(i, brief, bodyHtml){
@@ -589,7 +599,7 @@ const FLAGS = [
   ["h","It was sent in the middle of the night"]
 ];
 function stage1(el){
-  const i=0, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s1"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const phase = done ? "clues" : (ui.s1p || "tri");
   const open = ui.s1open || "e1";
   const m = EMAILS.find(x=>x.id===open);
@@ -695,7 +705,7 @@ const LOG = [
   ["09:02:15","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Payments: supplier bank details edited (Northfield Pallets)","INFO"]
 ];
 function stage2(el){
-  const i=1, st=S.stages[i], ui=S.ui;
+  const i=idx("s2"), st=S.stages[i], ui=S.ui;
   const f = ui.s2f || {acct:"", res:""};
   const hl = ui.s2hl || [];
   const accts=[...new Set(LOG.map(r=>r[1]))].sort(), ips=[...new Set(LOG.map(r=>r[2]))];
@@ -764,7 +774,7 @@ const AUDIT = [
   ["09:40:12","export_report","p.shah","81.2.69.140","report: weekly_payables","OK"]
 ];
 function stageTimeline(el){
-  const i=2, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s3"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const order = done ? Object.keys(TL) : (ui.tlord || TL_START);
   const partA = done || ui.tlok;
   el.innerHTML = stageFrame(i,
@@ -830,13 +840,14 @@ function freqChart(text){
     </div>`;
 }
 function stage3(el){
-  const i=3, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s4"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const decoded = ui.s3dec||done ? atob(CIPHER_B64) : "";
   const n = done ? 11 : (ui.s3shift||0);
   const partA = done || ui.s3partA;
   const vkey = done ? "NORTHFIELD" : (ui.vkey||"");
   el.innerHTML = stageFrame(i,
-    `While signed in as Dan, the attacker saved two draft emails with no recipient. Attackers sometimes leave notes for each other in drafts, because nothing is ever sent. Decode both notes to find out what the attacker plans next.`,
+    SHORT ? `While signed in as Dan, the attacker saved a draft email with no recipient. Attackers sometimes leave notes for each other in drafts, because nothing is ever sent. Decode it to find out what the attacker plans next.`
+          : `While signed in as Dan, the attacker saved two draft emails with no recipient. Attackers sometimes leave notes for each other in drafts, because nothing is ever sent. Decode both notes to find out what the attacker plans next.`,
     `<div class="task" style="margin-top:0">
       <span class="label">Note 1 · Draft in d.okafor's mailbox · 08:22</span>
       <div class="cipherbox" style="margin-top:.4rem">${CIPHER_B64}</div>
@@ -863,10 +874,10 @@ function stage3(el){
       <h3>What is the name of the backup account the attacker plans to use?</h3>
       <div class="row">
         <input type="text" id="s3ans" style="max-width:320px" autocomplete="off" spellcheck="false" placeholder="Account name" value="${done||partA?"svc_kestrel":esc(ui.s3ans||"")}" ${partA?"disabled":""}>
-        ${!partA?`<button class="btn primary" id="s3go">Submit</button>`:`<span class="pill ok">Correct</span>`}
+        ${!partA?`<button class="btn primary" id="s3go">Submit</button>`:SHORT?"":`<span class="pill ok">Correct</span>`}
       </div>
     </div>`:""}
-    ${partA?`
+    ${partA && !SHORT?`
     <div class="task" style="margin-top:2rem">
       <span class="label">Note 2 · Draft in d.okafor's mailbox · 08:24</span>
       <div class="cipherbox" style="margin-top:.4rem">${VIG}</div>
@@ -895,7 +906,8 @@ function stage3(el){
   const go=$("#s3go"); if(go) go.onclick=()=>{
     const v=(inp.value||"").trim().toLowerCase().replace(/\s+/g,"");
     if(!v){ feedback("info","Type the account name first."); return; }
-    if(check(v,"ca2ade43")||check(v,"ca3fb57a")){ S.ui.s3partA=true; save(); render(); feedback("info",`Correct. The shift was 11, so E had become P. The note also says the next target is in note 2, locked with a one-word key: the supplier they already changed. Scroll down.`); }
+    if((check(v,"ca2ade43")||check(v,"ca3fb57a")) && SHORT){ S.ui.s3partA=true; solved(i, `Solved. The shift was 11, so E had become P. The note says the attacker plans to change more bank details before Friday's payment run and has a backup account, <span class="mono">svc_kestrel</span>, in case Dan's mailbox is locked. Someone created that account on Monday. The next stage finds out how.`); }
+    else if(check(v,"ca2ade43")||check(v,"ca3fb57a")){ S.ui.s3partA=true; save(); render(); feedback("info",`Correct. The shift was 11, so E had become P. The note also says the next target is in note 2, locked with a one-word key: the supplier they already changed. Scroll down.`); }
     else wrong(i, "That is not the account name in the note. Make sure the whole message reads as plain English first.");
   };
   const vk=$("#vkey"); if(vk && !done) vk.oninput=e=>{ S.ui.vkey=e.target.value; $("#vplain").textContent=vigDecrypt(VIG,e.target.value); save(); };
@@ -944,7 +956,7 @@ function strength(pw){
 }
 function hashDiff(h1,h2){ let n=0; const out=[...h1].map((c,k)=>{ const d=c!==h2[k]; if(d) n++; return d?`<mark>${c}</mark>`:c; }).join(""); return {html:out, n}; }
 function stagePw(el){
-  const i=5, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s6"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const P = ui.pw || {};
   const a1 = ui.pwA ?? "Pennine2026", a2 = ui.pwB ?? "pennine2026";
   const h1 = sha256(a1), h2 = sha256(a2), hd = hashDiff(h2,h1);
@@ -1069,7 +1081,7 @@ function fwMatch(rule, ip, port){
 }
 function fwEval(rules, ip, port){ for(let k=0;k<rules.length;k++){ if(fwMatch(rules[k],ip,port)) return {act:rules[k].a, rule:k+1}; } return {act:"deny", rule:0}; }
 function stageFw(el){
-  const i=6, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s7"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const rules = ui.fw || FW_DEFAULT.map(r=>({...r}));
   const res = PACKETS.map(p=>({p, r:fwEval(rules,p[0],p[1])}));
   const passes = res.filter(x=>x.r.act===x.p[3]).length;
@@ -1144,7 +1156,7 @@ const ACTIONS = [
   ["k13","Delete the logs now that the incident is over, to save space"]
 ];
 function stageRespond(el){
-  const i=8, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s9"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const pick = ui.rsp || {};
   const ANS = "nnnnwnwwlllxx";
   el.innerHTML = stageFrame(i,
@@ -1207,7 +1219,7 @@ const FIXES = [
       ["c","Rename the field from role to r so attackers can't guess it"]]}
 ];
 function stage4(el){
-  const i=4, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s5"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   const marked = new Set(ui.s4lines||[]);
   const phase2 = done || ui.s4phase2;
   const fx = ui.s4fix || {};
@@ -1301,7 +1313,7 @@ function drawPlot(){
   }
 }
 function stage5(el){
-  const i=7, st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const i=idx("s8"), st=S.stages[i], ui=S.ui, done=st.status==="done";
   if(done && ML.epoch===0) trainSteps(2000);
   const trained = ML.epoch>0, t=(ui.s5t||50)/100;
   const s = trained ? mlStats(t) : {tp:0,fp:0};
@@ -1362,11 +1374,11 @@ function stage5(el){
   el.querySelectorAll("#s5qs input").forEach(r=>r.onchange=()=>{ S.ui.s5q={a:(el.querySelector("input[name=q5a]:checked")||{}).value, b:(el.querySelector("input[name=q5b]:checked")||{}).value}; save(); });
   const go=$("#s5go"); if(go) go.onclick=()=>{
     const q=S.ui.s5q||{}; if(!q.a||!q.b){ feedback("info","Answer both questions."); return; }
-    if(check(q.a+"|"+q.b,"7fcef1df")) solved(i, `Solved. The hardest attack to spot looked almost normal because the attacker already had a real password. Machine learning helps, but it is a trade-off: a low threshold floods analysts with alerts (alert fatigue), and a high one misses quiet attacks. That is why detection is combined with prevention, like the fixes from stage 5.`);
+    if(check(q.a+"|"+q.b,"7fcef1df")) solved(i, `Solved. The hardest attack to spot looked almost normal because the attacker already had a real password. Machine learning helps, but it is a trade-off: a low threshold floods analysts with alerts (alert fatigue), and a high one misses quiet attacks. That is why detection is combined with prevention, like the fixes from stage ${idx("s5")+1}.`);
     else wrong(i, "At least one answer is wrong. Try moving the slider back to 50% and to 1% to see for yourself.");
   };
 }
-window.addEventListener("resize", ()=>{ if(S.current===7) drawPlot(); });
+window.addEventListener("resize", ()=>{ if(S.current===idx("s8")) drawPlot(); });
 
 /* =====================================================================
    INCIDENT REPORT
@@ -1376,14 +1388,16 @@ function renderReport(){
   const mins = Math.round(((S.finished||Date.now())-S.started)/60000);
   const mask = S.stages.reduce((m,s,k)=>m|(s.status==="done"?1<<k:0),0);
   const code = makeCode(totalScore(), mins, mask);
+  const stageLabel = ids => { const n=ids.map(x=>idx(x)+1).filter(x=>x>0); return n.length>1 ? "Stages "+n.slice(0,-1).join(", ")+" and "+n[n.length-1] : "Stage "+n[0]; };
   const CAREERS = [
-    ["Stages 1 and 9","Security awareness and incident management","Understanding how attackers trick people, and leading an organisation's response when they succeed."],
-    ["Stages 2 and 3","SOC analyst and digital forensics","Watching logs around the clock, spotting intrusions and rebuilding exactly what happened."],
-    ["Stages 4 and 6","Cryptography and data protection","Designing the maths that keeps data secret and stores passwords safely."],
-    ["Stage 5","Secure software engineering","Building systems that are hard to break, and reviewing code for flaws."],
-    ["Stage 7","Network engineering","Designing and defending the networks every organisation depends on."],
-    ["Stage 8","Machine learning engineer","Training models that detect fraud, malware and attacks at scale."]
-  ];
+    [["s1","s9"],"Security awareness and incident management","Understanding how attackers trick people, and leading an organisation's response when they succeed."],
+    [["s2","s3"],"SOC analyst and digital forensics","Watching logs around the clock, spotting intrusions and rebuilding exactly what happened."],
+    [["s4","s6"],"Cryptography and data protection","Designing the maths that keeps data secret and stores passwords safely."],
+    [["s5"],"Secure software engineering","Building systems that are hard to break, and reviewing code for flaws."],
+    [["s7"],"Network engineering","Designing and defending the networks every organisation depends on."],
+    [["s8"],"Machine learning engineer","Training models that detect fraud, malware and attacks at scale."]
+  ].filter(([ids])=>ids.some(x=>idx(x)>=0)).map(([ids,t,d])=>[stageLabel(ids),t,d]);
+  const KIND = ["one","two","three","four","five","six"][CAREERS.length-1];
   $("#app").innerHTML = `
   <div class="wrap" style="padding-block:2rem 3rem">
     <div class="stack" style="gap:.5rem;margin-bottom:1.75rem">
@@ -1398,14 +1412,15 @@ function renderReport(){
           <li><span class="when">07:52</span><br>Dan Okafor enters his password on the fake mailbox page.</li>
           <li><span class="when">08:01 to 08:03</span><br>The attacker signs in from 203.0.113.77 and sends repeated MFA prompts. Dan approves the fourth one.</li>
           <li><span class="when">08:19</span><br>A hidden mailbox rule diverts invoice emails so Dan won't see replies.</li>
-          <li><span class="when">08:22 to 08:24</span><br>Two notes left in Drafts reveal a backup account and a second target: Moorside Fuels, this Friday.</li>
+          ${SHORT ? `<li><span class="when">08:22</span><br>A note left in Drafts reveals a backup account and plans for more fake payments before Friday.</li>`
+                  : `<li><span class="when">08:22 to 08:24</span><br>Two notes left in Drafts reveal a backup account and a second target: Moorside Fuels, this Friday.</li>`}
           <li><span class="when">08:31</span><br>The attacker creates an admin account, svc_kestrel, through a flaw in the admin code.</li>
           <li><span class="when">09:02</span><br>Northfield Pallets' bank details are changed, 59 minutes after the attacker first signed in. £48,200 is paid to the attacker.</li>
         </ol>
         <h2 style="margin-top:.75rem">Recommendations</h2>
         <ul style="margin:0;padding-left:1.2rem;display:flex;flex-direction:column;gap:.35rem">
           <li>Disable svc_kestrel, reset Dan's password, end all his sessions and delete the mailbox rule.</li>
-          <li>Warn the bank and Moorside Fuels before Friday's payment run.</li>
+          <li>Warn the bank ${SHORT?"and check every supplier":"and Moorside Fuels"} before Friday's payment run.</li>
           <li>Block the attacker addresses, with firewall rules in the right order.</li>
           <li>Store passwords with a unique salt and a slow password hash, and check admin rights on the server.</li>
           <li>Rate-limit MFA prompts and require number matching.</li>
@@ -1429,7 +1444,7 @@ function renderReport(){
       </aside>
     </div>
     <section class="stack" style="margin-top:2.5rem">
-      <h2>You just worked as six kinds of specialist</h2>
+      <h2>You just worked as ${KIND} kinds of specialist</h2>
       <div class="careers">${CAREERS.map(([s,t,d])=>`<div class="career"><span class="label">${s}</span><b>${t}</b><span class="small muted">${d}</span></div>`).join("")}</div>
     </section>
     <section class="panel study" style="margin-top:2rem">
@@ -1455,7 +1470,7 @@ function renderReport(){
   $("#backCase").onclick=()=>{ S.ui.view="case"; save(); render(); };
   $("#resetBtn").onclick=()=>{
     $("#resetZone").innerHTML=`<span class="confirm">This clears this team's progress. <button class="btn" id="resetYes">Clear</button><button class="btn ghost" id="resetNo">Cancel</button></span>`;
-    $("#resetYes").onclick=()=>{ store.del("rootcause.v2.team"); S=BLANK(); ML={w:[0,0,0],epoch:0,running:false}; render(); };
+    $("#resetYes").onclick=()=>{ store.del(STORE_KEY); S=BLANK(); ML={w:[0,0,0],epoch:0,running:false}; render(); };
     $("#resetNo").onclick=()=>render();
   };
   renderMeta();

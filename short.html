@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Root Cause Facilitator</title>
-<meta name="robots" content="noindex, nofollow">
+<title>Root Cause Express</title>
+<meta name="description" content="University of Bradford, School of Computing and Engineering. A 35–40 minute team investigation of a fictional cyber incident, covering phishing, log analysis, cryptography, secure code and machine learning.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -253,6 +253,12 @@ table.fw{border-collapse:collapse;width:100%;min-width:620px}
 .action{display:grid;grid-template-columns:1fr minmax(0,210px);gap:.75rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.5rem .7rem}
 
 /* ---------- Report ---------- */
+.presented{display:flex;flex-direction:column;gap:.6rem;padding-bottom:.5rem}
+.study{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:2rem;align-items:start}
+.study .uni-logo{width:100%}
+.courses{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.4rem}
+.courses li{padding:.5rem .75rem;border:1px solid var(--line);border-radius:var(--r);font-weight:600;font-size:.95rem}
+a.btn{text-decoration:none}
 .report{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:2rem}
 .timeline{list-style:none;margin:0;padding:0;border-left:2px solid var(--line)}
 .timeline li{position:relative;padding:0 0 1rem 1.25rem}
@@ -267,7 +273,7 @@ table.fw{border-collapse:collapse;width:100%;min-width:620px}
 .career{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:.9rem 1rem;display:flex;flex-direction:column;gap:.3rem}
 .career .label{color:var(--accent)}
 
-/* ---------- Facilitator ---------- */
+/* ---------- Leaderboard and clock ---------- */
 .clock{font-family:var(--f-mono);font-weight:600;font-size:clamp(4rem,14vw,9rem);line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .clock.low{color:var(--bad)}
 .fac{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.5rem;padding-block:1.75rem 3rem}
@@ -283,16 +289,6 @@ details.prompt{border-top:1px solid var(--line);padding:.6rem 0}
 details.prompt summary{cursor:pointer;font-weight:600}
 details.prompt p{margin-top:.4rem;font-size:.93rem}
 
-.tabs{display:flex;gap:.25rem;background:var(--surface-2);padding:.25rem;border-radius:var(--r)}
-.tabs button{all:unset;cursor:pointer;padding:.35rem .8rem;border-radius:4px;font-weight:600;font-size:.9rem;color:var(--muted)}
-.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.tabs button:focus-visible{outline:3px solid var(--accent)}
-.tabs button:disabled{opacity:.5;cursor:not-allowed}
-.proj{align-items:start}
-.proj .lb{font-size:1.2rem}
-.proj .lb td{padding:.7rem .5rem}
-.answer ol{margin:.4rem 0 0;padding-left:1.3rem;font-size:.93rem}
-.answer p{margin-top:.4rem;font-size:.93rem}
 @media (max-width: 860px){
   .ticket,.case,.report,.fac,.ml{grid-template-columns:1fr}
   .rail{position:static;flex-direction:row;overflow-x:auto;gap:.35rem;padding-bottom:.25rem}
@@ -300,6 +296,8 @@ details.prompt p{margin-top:.4rem;font-size:.93rem}
   .rail .s,.rail .sep{display:none}
   .inbox{grid-template-columns:1fr}
   .mlist{border-right:0;border-bottom:1px solid var(--line);max-height:260px;overflow-y:auto}
+  .study{grid-template-columns:1fr;gap:1.25rem}
+  .study .uni-logo{width:200px}
   .checks,.qgrid,.hashpair,.rankgrid,.action{grid-template-columns:1fr}
   .bar .meta{gap:.9rem}
 }
@@ -310,7 +308,7 @@ details.prompt p{margin-top:.4rem;font-size:.93rem}
 <body>
 <header class="bar">
   <div class="wrap">
-    <div class="mark">Root Cause <span class="inc">Facilitator console</span></div>
+    <div class="mark">Root Cause <span class="inc" id="incId">INC-2026-1013</span></div>
     <div class="meta" id="meta"></div>
   </div>
 </header>
@@ -322,7 +320,6 @@ details.prompt p{margin-top:.4rem;font-size:.93rem}
    CONFIG: edit these values for your institution and session.
    ===================================================================== */
 const CONFIG = {
-  sessionMinutes: { full: 45, short: 25 },   // mission time on the countdown for each version
   university: "University of Bradford",
   department: "School of Computing and Engineering",
   courses: [
@@ -333,7 +330,8 @@ const CONFIG = {
     "BSc Software and Artificial Intelligence Engineering"
   ],
   website: "https://www.bradford.ac.uk/undergraduate/subjects/computing",
-  openDay: "Find open day dates, entry requirements and course details on our website."
+  openDay: "Find open day dates, entry requirements and course details on our website.",
+  variant: "short"              // "full" = 9 stages (~45 min); "short" = 5 stages (~25 min)
 };
 
 /* ---------- small helpers ---------- */
@@ -346,6 +344,73 @@ const store = {
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
+
+/* ---------- stage definitions ---------- */
+const ALL_STAGES = [
+  { id:"s1", title:"Initial access", sub:"Phishing analysis", topic:"Cyber security",
+    hints:[
+      "Check the full sender address of every email, not just the display name, and compare it with the company's real domain, tarnvalley.example. Hover over or tap every button to see where it really goes. Two emails are malicious.",
+      "The parcel email wants card details, not a work password. For the clues, one tempting option does not appear in the IT email at all, and another is something attackers copy easily."
+    ]},
+  { id:"s2", title:"Sign-in trail", sub:"Log analysis", topic:"Security operations",
+    hints:[
+      "Filter the log to results that failed. One burst of failures hits lots of accounts in a few seconds. That is noise. Look for a different pattern: one account, one unfamiliar IP address, a few failures and then a success.",
+      "The password was correct every time from the unfamiliar address. What kept failing was the second step. Count the MFA denials before the approval."
+    ]},
+  { id:"s3", title:"Timeline", sub:"Digital forensics", topic:"Digital forensics",
+    hints:[
+      "Most events have an exact time in the stage 2 sign-in log or the audit log on this page. The phishing email arrived at 07:41 and Dan entered his password at 07:52.",
+      "The password spray from Frankfurt happened before any of the attacker's actions. It was a separate, failed attack."
+    ]},
+  { id:"s4", title:"The attacker's notes", sub:"Cryptanalysis", topic:"Cryptography",
+    hints:[
+      "Note 1 ends in a pattern typical of Base64. Decode it first. The result is still scrambled, but spaces and punctuation are in place, so each letter has only been shifted. E is the most common English letter: find the tallest blue bar and count how far it is from E.",
+      "For note 2, the keyword is one word: the first word of the supplier whose bank details were already changed (see stage 1 or the sign-in log)."
+    ],
+    shortHints:[
+      "The string ends in a pattern typical of Base64. Decode it first. The result is still scrambled, but the spaces and punctuation are in place, so each letter has only been shifted.",
+      "In English, E is the most common letter. Find the tallest blue bar on the frequency chart and work out how far it is from E."
+    ]},
+  { id:"s5", title:"How it was possible", sub:"Secure code review", topic:"Software development",
+    hints:[
+      "Line 21 stores new passwords with hash_password(). Compare that with how sign_in() checks them. One of the three flaws is about MFA, and it matches exactly what you saw in the log.",
+      "The third flaw is in create_account(). Ask where the value of role comes from, and whether a user could change it before sending the request."
+    ]},
+  { id:"s6", title:"Password vault", sub:"Hashing and passwords", topic:"Data protection",
+    hints:[
+      "Part 1: change one letter in input B and count the highlighted characters. Part 2: identical passwords with no salt always give identical hashes, so look for two rows that match exactly.",
+      "Part 3: run all four through the strength checker. A password on the common-password list counts as the weakest, whatever its score."
+    ]},
+  { id:"s7", title:"Close the door", sub:"Firewall rules", topic:"Networking",
+    hints:[
+      "The first rule, Allow any address on port 443, matches the attacker before the deny rule below it is ever checked. Specific deny rules need to come before broad allow rules.",
+      "One working answer uses four rules: deny each attacker address on any port, allow any address on port 443, and allow only the office network on port 22. Turn off the rule that allows everything."
+    ]},
+  { id:"s8", title:"Catch it next time", sub:"Machine learning", topic:"Artificial intelligence",
+    hints:[
+      "Train the model first. At the default 50% threshold, look at which red cross is not ringed. That is the attack being missed.",
+      "Lower the threshold slowly and watch both counts. There is a band of values where every attack is caught and only one or two normal sign-ins are flagged."
+    ]},
+  { id:"s9", title:"Respond", sub:"Incident response plan", topic:"Security management",
+    hints:[
+      "Four of the actions stop the attacker or protect the money straight away. Two are harmful and should not happen at all.",
+      "\"This week\" is for fixing what let the attacker in: the code, the MFA settings and checking for other damage. \"Longer term\" is about people, processes and monitoring."
+    ]}
+];
+const SHORT = CONFIG.variant === "short";
+const PLAN = SHORT ? ["s1","s2","s4","s5","s8"] : ALL_STAGES.map(x=>x.id);
+const STAGES = ALL_STAGES.filter(x=>PLAN.includes(x.id)).map(x=> SHORT && x.shortHints ? {...x, hints:x.shortHints} : x);
+const idx = id => STAGES.findIndex(x=>x.id===id);
+const STORE_KEY = "rootcause.v2." + (SHORT ? "short" : "team");
+
+const BLANK = () => ({ team:"", started:null, finished:null, current:0, stages:STAGES.map(()=>({hints:0,wrong:0,status:"open",score:0})), ui:{} });
+let S = store.get(STORE_KEY) || BLANK();
+const save = () => store.set(STORE_KEY, S);
+
+function stageScore(i){ const st=S.stages[i]; if(st.status==="skipped") return 0; if(st.status!=="done") return 0; return Math.max(40, 100 - 15*st.hints - 10*st.wrong); }
+const totalScore = () => S.stages.reduce((a,_,i)=>a+stageScore(i),0);
+const unlocked = i => i===0 || S.stages[i-1].status!=="open";
+const allClosed = () => S.stages.every(s=>s.status!=="open");
 
 /* ---------- report code: score, minutes and stages, with a checksum ---------- */
 const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -365,143 +430,1053 @@ function readCode(str){
   return { score:Math.floor(p/32768), minutes:Math.floor(p/512)%64, mask:p%512 };
 }
 
+/* ---------- top bar ---------- */
+let tick = null;
 function fmtTime(ms){ const t=Math.max(0,Math.floor(ms/1000)); return String(Math.floor(t/60)).padStart(2,"0")+":"+String(t%60).padStart(2,"0"); }
+function renderMeta(){
+  const m = $("#meta");
+  if(!S.started){ m.innerHTML = ""; return; }
+  const elapsed = (S.finished||Date.now()) - S.started;
+  m.innerHTML = `
+    <div><span class="label k">Team</span><span class="v" style="font-family:var(--f-body)">${esc(S.team)}</span></div>
+    <div><span class="label k">Score</span><span class="v">${totalScore()}</span></div>
+    <div><span class="label k">Elapsed</span><span class="v" id="elapsed">${fmtTime(elapsed)}</span></div>`;
+}
+function startTick(){ clearInterval(tick); tick=setInterval(()=>{ const e=$("#elapsed"); if(e && S.started && !S.finished) e.textContent = fmtTime(Date.now()-S.started); },1000); }
+
+function render(){
+  renderMeta();
+  if(!S.started) return renderStart();
+  if(S.ui.view==="report") return renderReport();
+  renderCase();
+}
 
 /* =====================================================================
-   FACILITATOR CONSOLE
+   START SCREEN
    ===================================================================== */
-let F = store.get("rootcause.v2.fac") || { remaining: CONFIG.sessionMinutes.full*60, running:false, endAt:null, teams:[] };
-if(!F.variant) F.variant = "full";
-const VARIANTS = {
-  full:  { name:"Full", stages:9, file:"index.html" },
-  short: { name:"Express", stages:5, file:"short.html" }
-};
-const V = () => VARIANTS[F.variant];
-const mins = () => CONFIG.sessionMinutes[F.variant];
-const RUNSHEET = {
-  full: [
-    ["0–5 min","Welcome and brief. Form teams of 3–5 with one laptop or tablet each. Give out the student link (index.html). Read the start screen together and explain scoring."],
-    ["5–50 min","Mission. Start the countdown. Circulate and nudge teams towards the in-app hints rather than giving answers. Announce at 30, 15 and 5 minutes left."],
-    ["50–53 min","Collect report codes and reveal the leaderboard."],
-    ["53–60 min","Debrief using the prompts below, then link each stage to a career and a course."]
-  ],
-  short: [
-    ["0–4 min","Welcome and brief. Form teams of 3–5 with one laptop or tablet each. Give out the Express student link (short.html). Explain scoring in one sentence: hints and wrong answers cost points."],
-    ["4–29 min","Mission. Start the countdown. Circulate and nudge teams towards the in-app hints. Announce at 15 and 5 minutes left."],
-    ["29–31 min","Collect report codes and reveal the leaderboard."],
-    ["31–38 min","Debrief: pick two or three of the prompts below, then link the stages to careers and courses."]
-  ]
-};
-const PACING = {
-  full: "Pacing: about 5 minutes per stage. By 25 minutes most teams should be on stage 5. Fast teams may finish early and slower teams may not reach stage 9, so the leaderboard ranks by score first and time second. If most teams are stuck on one stage, pause the room and walk through its first hint together.",
-  short: "Pacing: about 5 minutes per stage. By 12 minutes most teams should be on stage 3. If a team is still on stage 1 after 8 minutes, point them to the hint. The leaderboard ranks by score first and time second, so teams that don't finish still place."
-};
-const PROMPTS = [
-  ["Phishing", "Why was this email well written, with a real logo? What could Dan have checked in five seconds? Why do companies say they will never ask for your password?", true],
-  ["Logs and MFA", "Why did Dan press Approve? Have you ever tapped a notification just to make it go away? What else in the log looked alarming but turned out to be noise?", true],
-  ["Timeline", "Why do police and insurers need exact times? What would have happened if Dan had reported the sign-in alert at 08:04? How could the company shrink a 59-minute window?", false],
-  ["Cryptography", "What is the difference between encoding and encryption? Why is a Caesar cipher so easy to break? What do we actually use today (AES, RSA), and why is frequency analysis useless against them?", true],
-  ["Secure code", "Every flaw here was a single line. Why do developers make these mistakes? Who reviews code in a real company? Why is \"hide it\" never a security fix?", true],
-  ["Passwords and hashing", "If hashing is one-way, how does a website check your password? Why did two staff choose the same password? Is a long passphrase really better than a short complex one?", false],
-  ["Firewall", "Why does rule order matter? What else is on the internet trying to connect to your home router right now? Why are firewalls only one layer of defence?", false],
-  ["Machine learning", "What's the cost of a missed attack compared with a false alarm, and who decides? Could a model trained on last year's attacks miss next year's? Where else is this trade-off made, for example in medical screening or spam filters?", true],
-  ["Response", "Why is blaming Dan a bad idea, even though he clicked? Who else would a real company need to tell (bank, police, insurer, possibly the ICO)? What would you do first if this were your school?", false]
-];
-let tab = store.get("rootcause.v2.factab") || "projector";
-let fTick=null;
-const saveF = () => store.set("rootcause.v2.fac", F);
-function fRemaining(){ return F.running ? Math.max(0, Math.round((F.endAt-Date.now())/1000)) : F.remaining; }
-
-
-function renderFacilitator(){
-  const rows = [...F.teams].sort((a,b)=>b.score-a.score || a.minutes-b.minutes);
-  $("#meta").innerHTML = `<div class="tabs" role="tablist">
-      <button role="tab" id="tabP" aria-selected="${tab==="projector"}">Projector</button>
-      <button role="tab" id="tabN" aria-selected="${tab==="notes"}">Session notes</button>
-    </div>`;
-  $("#tabP").onclick=()=>{ tab="projector"; store.set("rootcause.v2.factab",tab); renderFacilitator(); };
-  $("#tabN").onclick=()=>{ tab="notes"; store.set("rootcause.v2.factab",tab); renderFacilitator(); };
-
-  if(tab==="notes"){
-    $("#app").innerHTML = `
-    <div class="wrap fac">
-      <section class="stack">
-        <p class="small muted">Showing notes for the <b>${V().name}</b> version. Change the version on the Projector tab.</p>
-        <div class="panel stack">
-          <h3>${F.variant==="short"?"Express run sheet (35–40 min)":"One-hour run sheet"}</h3>
-          <ol class="runsheet">
-            ${RUNSHEET[F.variant].map(([w,t])=>`<li><span class="when">${w}</span><span>${t}</span></li>`).join("")}
-          </ol>
-          <p class="small muted">${PACING[F.variant]}</p>
-        </div>
-      </section>
-      <section class="stack">
-        <div class="panel">
-          <h3 style="margin-bottom:.4rem">Debrief prompts</h3>
-          ${PROMPTS.filter(p=>F.variant==="full"||p[2]).map(([t,q])=>`<details class="prompt"><summary>${t}</summary><p>${q}</p></details>`).join("")}
-        </div>
-      </section>
-    </div>`;
-    clearInterval(fTick);
-    return;
-  }
-
+function renderStart(){
   $("#app").innerHTML = `
-  <div class="wrap fac proj">
-    <section class="stack">
-    <div class="panel stack" style="align-items:flex-start">
-      <div class="row" style="justify-content:space-between;width:100%">
-        <span class="label">Mission time remaining</span>
-        <div class="tabs" role="radiogroup" aria-label="Session version">
-          ${Object.entries(VARIANTS).map(([k,v])=>`<button role="radio" data-variant="${k}" aria-selected="${F.variant===k}" aria-checked="${F.variant===k}" ${F.running?"disabled":""} title="${v.stages} stages, ${CONFIG.sessionMinutes[k]} min">${v.name} · ${v.stages} stages</button>`).join("")}
+  <div class="wrap ticket">
+    <section>
+      <div class="ticket-head">
+        <span class="pill sev">Severity 2</span>
+        <span class="pill warn">Status: investigating</span>
+        <span class="label">Tarn Valley Freight · Incident response</span>
+      </div>
+      <h1>£48,200 went to the wrong bank account.</h1>
+      <p class="lede">Tarn Valley Freight, a haulage firm in the Pennines, has just found that a supplier's bank details were changed in its payroll and payments portal on Monday morning. Nobody in Finance made the change. You are the incident response team. Work out how the attacker got in, what they did and what they plan next, then decide how to stop it happening again.</p>
+      <dl class="facts">
+        <dt>Ticket</dt><dd>INC-2026-1013</dd>
+        <dt>Reported by</dt><dd>Priya Shah, Finance Manager</dd>
+        <dt>First noticed</dt><dd>Mon 13 Oct 2026, 11:20</dd>
+        <dt>Systems</dt><dd>Email, staff sign-in portal, payments</dd>
+      </dl>
+      <p class="small muted" style="margin-top:1.5rem;max-width:62ch">Tarn Valley Freight and everyone in this case are fictional. Every address uses the reserved <span class="mono">.example</span> domain and documentation IP ranges.</p>
+    </section>
+    <aside class="stack">
+      <div class="presented"><span class="label">Presented by</span><div class="uni-logo" role="img" aria-label="${esc(CONFIG.university)}, ${esc(CONFIG.department)}"></div></div>
+      <div class="panel stack">
+        <h3>Your investigation</h3>
+        <ol class="steps-list">
+          ${STAGES.map((s,i)=>`<li><span class="n">${String(i+1).padStart(2,"0")}</span><span><b>${s.title}</b> <span class="muted small">· ${s.sub}</span></span></li>`).join("")}
+        </ol>
+        <p class="small muted">Each stage is worth up to 100 points. Hints cost 15 points and wrong answers cost 10, but a solved stage never scores below 40. Stages unlock in order and later stages use evidence from earlier ones. You can skip a stage if you are stuck, but it scores 0. Expect to need most of the session.</p>
+      </div>
+      <form class="panel stack" id="startForm">
+        <div>
+          <label class="label" for="teamName">Team name</label>
+          <input type="text" id="teamName" maxlength="24" autocomplete="off" placeholder="e.g. Blue Team 4" required>
+        </div>
+        <button class="btn primary" type="submit">Open the case</button>
+      </form>
+    </aside>
+  </div>`;
+  $("#startForm").addEventListener("submit", e=>{
+    e.preventDefault();
+    const name = $("#teamName").value.trim();
+    if(!name) return;
+    S = BLANK(); S.team = name; S.started = Date.now(); save(); render(); startTick();
+  });
+}
+
+/* =====================================================================
+   CASE SHELL
+   ===================================================================== */
+function renderCase(){
+  const i = S.current;
+  $("#app").innerHTML = `
+  <div class="wrap case">
+    <nav class="rail" aria-label="Investigation stages">
+      ${STAGES.map((s,k)=>{
+        const st=S.stages[k].status;
+        return `<button data-go="${k}" class="${st}" ${k===i?'aria-current="step"':''} ${unlocked(k)?'':'disabled'}>
+          <span class="dot">${st==="done"?"✓":st==="skipped"?"–":k+1}</span>
+          <span><span class="t">${s.title}</span><br><span class="s">${s.sub}${st==="done"?" · "+stageScore(k)+" pts":""}</span></span>
+        </button>`;}).join("")}
+      <div class="sep"></div>
+      <button data-go="report" ${allClosed()?'':'disabled'}><span class="dot">R</span><span><span class="t">Incident report</span><br><span class="s">${allClosed()?"Ready":"Finish all stages"}</span></span></button>
+    </nav>
+    <section id="stage" aria-live="polite"></section>
+  </div>`;
+  $(".rail").addEventListener("click", e=>{
+    const b = e.target.closest("button[data-go]"); if(!b || b.disabled) return;
+    if(b.dataset.go==="report"){ S.ui.view="report"; save(); return render(); }
+    S.current = +b.dataset.go; save(); render(); window.scrollTo({top:0});
+  });
+  ({s1:stage1,s2:stage2,s3:stageTimeline,s4:stage3,s5:stage4,s6:stagePw,s7:stageFw,s8:stage5,s9:stageRespond})[STAGES[i].id]($("#stage"));
+}
+
+function stageFrame(i, brief, bodyHtml){
+  const s = STAGES[i], st = S.stages[i];
+  const hintsShown = s.hints.slice(0, st.hints).map((h,k)=>`<div class="hintbox"><b>Hint ${k+1}.</b> ${h}</div>`).join("");
+  const closed = st.status!=="open";
+  return `
+  <div class="stage-head">
+    <span class="label">Stage ${i+1} of ${STAGES.length} · ${s.topic}</span>
+    <h2>${s.title}</h2>
+    <p class="brief">${brief}</p>
+  </div>
+  ${bodyHtml}
+  <div class="stack" style="margin-top:1rem" id="fbZone"></div>
+  ${hintsShown ? `<div class="stack" style="margin-top:1rem">${hintsShown}</div>` : ""}
+  <div class="toolbar">
+    <div class="row">
+      ${!closed && st.hints < s.hints.length ? `<button class="btn" id="hintBtn">Show hint ${st.hints+1} (−15)</button>` : ""}
+      ${!closed ? `<span id="skipZone"><button class="btn ghost" id="skipBtn">Skip this stage</button></span>` : ""}
+    </div>
+    ${closed ? `<button class="btn primary" id="nextBtn">${i<STAGES.length-1?"Next stage →":"Write the incident report →"}</button>` : `<span class="small muted">Worth up to ${Math.max(40,100-15*st.hints-10*st.wrong)} points now</span>`}
+  </div>`;
+}
+function wireFrame(i){
+  const hb=$("#hintBtn"); if(hb) hb.onclick=()=>{ S.stages[i].hints++; save(); render(); };
+  const sb=$("#skipBtn"); if(sb) sb.onclick=()=>{
+    $("#skipZone").innerHTML = `<span class="confirm">Skip and score 0 for this stage? <button class="btn" id="skipYes">Skip</button><button class="btn ghost" id="skipNo">Keep going</button></span>`;
+    $("#skipYes").onclick=()=>{ S.stages[i].status="skipped"; advance(i); };
+    $("#skipNo").onclick=()=>render();
+  };
+  const nb=$("#nextBtn"); if(nb) nb.onclick=()=>advance(i, true);
+}
+function advance(i, move){
+  save();
+  if(move || S.stages[i].status==="skipped"){
+    if(i<STAGES.length-1){ S.current=i+1; } else { finishIfDone(); S.ui.view="report"; }
+    save(); render(); window.scrollTo({top:0});
+  } else render();
+}
+function finishIfDone(){ if(allClosed() && !S.finished){ S.finished=Date.now(); save(); } }
+function feedback(kind, html){ const z=$("#fbZone"); if(z) z.innerHTML = `<div class="feedback ${kind}">${html}</div>`; }
+function wrong(i, html){ S.stages[i].wrong++; save(); renderMeta(); feedback("bad", html + ` <span class="small">(−10)</span>`);
+  const w=$(".toolbar .small.muted"); if(w) w.textContent = `Worth up to ${Math.max(40,100-15*S.stages[i].hints-10*S.stages[i].wrong)} points now`; }
+function solved(i, html){ S.stages[i].status="done"; S.stages[i].score=stageScore(i); if(i===STAGES.length-1) finishIfDone(); save(); render(); feedback("ok", html); }
+
+/* =====================================================================
+   STAGE 1: PHISHING
+   ===================================================================== */
+const EMAILS = [
+  { id:"e1", name:"Priya Shah", addr:"p.shah@tarnvalley.example", time:"Mon 06:52", subj:"Friday payment run moved to 10:00",
+    body:`<p>Morning Dan,</p><p>Quick one. The supplier payment run on Friday is moving from 14:00 to 10:00 because the bank cut-off has changed. Can you have the approved list ready by Thursday afternoon?</p><p>Thanks,<br>Priya</p>` },
+  { id:"e2", name:"Northfield Pallets Accounts", addr:"accounts@northfieldpallets.example", time:"Mon 07:05", subj:"Invoice NP-20931 as discussed",
+    body:`<p>Hi Dan,</p><p>As discussed on the phone on Thursday, please find attached invoice NP-20931 for the October pallet order. Payment terms as usual, 30 days.</p><p>Kind regards,<br>Helen Marsh<br>Northfield Pallets Ltd</p><span class="attach">📄 NP-20931.pdf · 184 KB</span>` },
+  { id:"e3", name:"IT Service Desk", addr:"servicedesk@tarnvalley-support.example", time:"Mon 07:41", subj:"Mailbox storage 98% full: action required",
+    body:`<span class="logo-chip"><i></i>TARN VALLEY FREIGHT</span><p>Dear user,</p><p>Your mailbox has reached 98% of its storage limit. New messages may be rejected and your account will be suspended if the problem is not resolved.</p><p>To keep your mailbox active, please re-validate your account within <b>2 hours</b> using the secure portal below.</p><button class="cta" data-href="https://tarnvalley-mail-verify.example/login?u=d.okafor">Re-validate mailbox</button><p>Or copy this address into your browser: <button class="fakelink" data-href="https://tarnvalley-mail-verify.example/login?u=d.okafor">https://portal.tarnvalley.example/mailbox</button></p><p>Regards,<br>IT Service Desk<br>Tarn Valley Freight</p>` },
+  { id:"e4", name:"Tarn Valley IT", addr:"it-announce@tarnvalley.example", time:"Mon 07:48", subj:"Planned maintenance this Saturday",
+    body:`<p>Hello everyone,</p><p>The staff portal will be unavailable on Saturday between 06:00 and 09:00 for planned updates. No action is needed from you.</p><p>A reminder that IT will never ask for your password by email or phone.</p><p>Tarn Valley IT</p>` },
+  { id:"e7", name:"DelivR Parcels", addr:"notify@delivr-parcels.example", time:"Mon 07:58", subj:"We couldn't deliver your parcel",
+    body:`<p>Hello,</p><p>We tried to deliver your parcel today but nobody was available to sign for it. Your parcel is being held at our depot.</p><p>To arrange redelivery, pay the £1.99 redelivery fee within 24 hours or your parcel will be returned to the sender.</p><button class="cta" data-href="https://delivr-redelivery.example/pay?ref=TV88213">Pay and rebook</button><p>DelivR Customer Care</p>` },
+  { id:"e5", name:"Tarn Valley Sign-in", addr:"no-reply@login.tarnvalley.example", time:"Mon 08:04", subj:"New sign-in to your account",
+    body:`<p>Your account <b>d.okafor</b> was signed in from a new location.</p><p>Location: Amsterdam, NL<br>Time: Mon 13 Oct, 08:03<br>Device: Unknown</p><p>If this was you, you can ignore this message. If not, contact IT on extension 2200.</p>` },
+  { id:"e6", name:"Staff Social Club", addr:"social@tarnvalley.example", time:"Mon 08:15", subj:"Quiz night tickets now on sale",
+    body:`<p>Our autumn quiz night is on Friday 24 October at the Drovers Arms. Tickets are £5 and include a pie. Reply to this email to reserve a team table.</p>` }
+];
+const FLAGS = [
+  ["a","The sender's domain is tarnvalley-support.example, not the company's tarnvalley.example"],
+  ["b","The link text shows one address, but the link actually goes to a different site"],
+  ["c","It threatens suspension unless you act within a short deadline"],
+  ["d","It greets you as \"Dear user\" instead of by name"],
+  ["e","It contains spelling and grammar mistakes"],
+  ["f","It includes the company logo"],
+  ["g","It has a suspicious attachment"],
+  ["h","It was sent in the middle of the night"]
+];
+function stage1(el){
+  const i=idx("s1"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const phase = done ? "clues" : (ui.s1p || "tri");
+  const open = ui.s1open || "e1";
+  const m = EMAILS.find(x=>x.id===open);
+  const tri = ui.s1tri || {};
+  const nTri = Object.keys(tri).length;
+  const chip = id => { const v = phase==="tri" ? tri[id] : (["e3","e7"].includes(id) ? "sus" : "safe");
+    return v==="sus" ? `<span class="pill sev">Suspicious</span>` : v==="safe" ? `<span class="pill ok">Safe</span>` : ""; };
+  let task = "";
+  if(phase==="tri"){
+    task = `<div class="task row"><button class="btn primary" id="s1a" ${nTri===EMAILS.length?"":"disabled"}>Submit triage</button><span class="small muted">${nTri} of ${EMAILS.length} emails sorted. Open each email and mark it safe or suspicious.</span></div>`;
+  } else if(phase==="which"){
+    task = `<div class="task"><h3>Which suspicious email gave the attacker Dan's portal password?</h3>
+      <div class="radios">${["e3","e7"].map(id=>{const x=EMAILS.find(e=>e.id===id);return `<label class="radio"><input type="radio" name="s1w" id="s1w-${id}" value="${id}"><span><b>${x.name}</b> · ${x.subj}</span></label>`}).join("")}</div>
+      <div class="row" style="margin-top:1rem"><button class="btn primary" id="s1b">Submit</button></div></div>`;
+  } else {
+    task = `<div class="task">
+      <h3>Which clues gave the IT Service Desk email away?</h3>
+      <p class="muted small" style="margin-bottom:.75rem">Tick every clue that applies to this email, and only those.</p>
+      <div class="checks">
+        ${FLAGS.map(([k,t])=>`<label class="check"><input type="checkbox" id="flag-${k}" value="${k}" ${(ui.s1flags||[]).includes(k)||done&&"abcd".includes(k)?"checked":""} ${done?"disabled":""}><span>${t}</span></label>`).join("")}
+      </div>
+      ${!done?`<div class="row" style="margin-top:1rem"><button class="btn primary" id="s1c">Submit clues</button></div>`:""}
+    </div>`;
+  }
+  el.innerHTML = stageFrame(i,
+    `Dan Okafor in Accounts says he "didn't do anything unusual" on Monday morning. This is his inbox. First sort every email into safe or suspicious. Then work out which one handed the attacker his password, and what should have given it away.`,
+    `<div class="inbox">
+      <div class="mlist" role="listbox" aria-label="Dan's inbox">
+        ${EMAILS.map(x=>`<button role="option" data-mail="${x.id}" aria-selected="${x.id===open}">
+          <span class="from"><span>${x.name}</span><span class="time">${x.time}</span></span>
+          <span class="subj">${x.subj}</span>
+          <span>${chip(x.id)}</span>
+        </button>`).join("")}
+      </div>
+      <article class="mview">
+        <div class="mhead">
+          <h3>${m.subj}</h3>
+          <span><b>${m.name}</b> <span class="addr">&lt;${m.addr}&gt;</span></span>
+          <span class="addr">To: d.okafor@tarnvalley.example · ${m.time}</span>
+        </div>
+        <div class="mbody">${m.body}</div>
+        <div id="peek"></div>
+        ${phase==="tri" ? `<div class="row"><span class="label">This email is</span>
+          <button class="btn" data-tri="safe" aria-pressed="${tri[m.id]==="safe"}">${tri[m.id]==="safe"?"✓ ":""}Safe</button>
+          <button class="btn" data-tri="sus" aria-pressed="${tri[m.id]==="sus"}">${tri[m.id]==="sus"?"✓ ":""}Suspicious</button></div>` : ""}
+      </article>
+    </div>
+    ${task}`);
+  wireFrame(i);
+  el.querySelector(".mlist").addEventListener("click", e=>{ const b=e.target.closest("[data-mail]"); if(!b) return; S.ui.s1open=b.dataset.mail; save(); render(); });
+  el.querySelectorAll("[data-href]").forEach(b=>{
+    const show=()=>{ $("#peek").innerHTML = `<div class="linkpeek">Link destination: ${esc(b.dataset.href)}</div>`; };
+    b.addEventListener("mouseenter", show); b.addEventListener("focus", show);
+    b.addEventListener("click", e=>{ e.preventDefault(); show(); });
+  });
+  el.querySelectorAll("[data-tri]").forEach(b=>b.onclick=()=>{
+    S.ui.s1tri = {...tri, [m.id]: b.dataset.tri};
+    const next = EMAILS.find(x=>!S.ui.s1tri[x.id]);
+    if(next) S.ui.s1open = next.id;
+    save(); render();
+  });
+  const a=$("#s1a"); if(a) a.onclick=()=>{
+    const sus = EMAILS.filter(x=>tri[x.id]==="sus").map(x=>x.id).sort();
+    if(check(sus.join(","), "e8e64138")){ S.ui.s1p="which"; save(); render(); feedback("info","Correct. Two emails are malicious. The sign-in alert and the supplier invoice look alarming but are genuine: both come from domains Dan already deals with and neither asks him to do anything risky."); }
+    else wrong(i, `Not quite. You marked ${sus.length} email${sus.length===1?"":"s"} as suspicious, and at least one email is in the wrong pile. Compare every sender's domain and every link destination.`);
+  };
+  const b=$("#s1b"); if(b) b.onclick=()=>{
+    const v=(el.querySelector("input[name=s1w]:checked")||{}).value;
+    if(!v){ feedback("info","Choose one of the two emails."); return; }
+    if(check(v, "2476c70c")){ S.ui.s1p="clues"; S.ui.s1open="e3"; save(); render(); feedback("info","Right. The parcel scam wanted card details, not a work password. The fake IT email asked Dan to sign in to his mailbox. Now pick out its clues."); }
+    else wrong(i, "That email was after something else. Which one asked Dan to sign in with his work account?");
+  };
+  const c=$("#s1c"); if(c) c.onclick=()=>{
+    const sel=[...el.querySelectorAll(".checks input:checked")].map(x=>x.value).sort();
+    S.ui.s1flags=sel; save();
+    if(check(sel.join(","), "bbd0dc68")) solved(i, `Solved. Modern phishing is often well written and uses a real logo, so spelling mistakes and branding tell you little. The domain and the true link destination are the reliable clues. Dan clicked the button at 07:52 and typed his password into the fake page.`);
+    else wrong(i, `Not quite. You ticked ${sel.length} clue${sel.length===1?"":"s"}. Check each one against the email itself.`);
+  };
+}
+
+/* =====================================================================
+   STAGE 2: LOGS
+   ===================================================================== */
+const LOG = [
+  ["06:58:12","p.shah","81.2.69.140","Leeds, GB","Password OK · MFA approved","SUCCESS"],
+  ["07:02:40","j.mercer","81.2.69.141","Leeds, GB","Password OK · MFA approved","SUCCESS"],
+  ["07:15:03","admin","198.51.100.23","Frankfurt, DE (hosting)","Wrong password","FAIL"],
+  ["07:15:04","administrator","198.51.100.23","Frankfurt, DE (hosting)","Unknown account","FAIL"],
+  ["07:15:06","p.shah","198.51.100.23","Frankfurt, DE (hosting)","Wrong password","FAIL"],
+  ["07:15:07","j.mercer","198.51.100.23","Frankfurt, DE (hosting)","Wrong password","FAIL"],
+  ["07:15:09","d.okafor","198.51.100.23","Frankfurt, DE (hosting)","Wrong password","FAIL"],
+  ["07:15:10","finance","198.51.100.23","Frankfurt, DE (hosting)","Unknown account","FAIL"],
+  ["07:31:55","d.okafor","81.2.69.142","Leeds, GB","Password OK · MFA approved","SUCCESS"],
+  ["08:01:10","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Password OK · MFA denied","FAIL"],
+  ["08:01:52","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Password OK · MFA denied","FAIL"],
+  ["08:02:37","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Password OK · MFA denied","FAIL"],
+  ["08:03:41","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Password OK · MFA approved","SUCCESS"],
+  ["08:05:02","k.bello","81.2.69.144","Leeds, GB","Password OK · MFA approved","SUCCESS"],
+  ["08:11:20","d.okafor","81.2.69.142","Leeds, GB","Session refreshed","INFO"],
+  ["08:19:47","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Mailbox rule created: move \"invoice\" emails to RSS Feeds","INFO"],
+  ["08:26:13","m.ruiz","81.2.69.145","Leeds, GB","Wrong password","FAIL"],
+  ["08:26:40","m.ruiz","81.2.69.145","Leeds, GB","Password OK · MFA approved","SUCCESS"],
+  ["09:02:15","d.okafor","203.0.113.77","Amsterdam, NL (hosting)","Payments: supplier bank details edited (Northfield Pallets)","INFO"]
+];
+function stage2(el){
+  const i=idx("s2"), st=S.stages[i], ui=S.ui;
+  const f = ui.s2f || {acct:"", res:""};
+  const hl = ui.s2hl || [];
+  const accts=[...new Set(LOG.map(r=>r[1]))].sort(), ips=[...new Set(LOG.map(r=>r[2]))];
+  const rows = LOG.map((r,k)=>[r,k]).filter(([r])=>(!f.acct||r[1]===f.acct)&&(!f.res||r[5]===f.res));
+  const done = st.status==="done";
+  const a = ui.s2a || {};
+  const sel=(id,opts,val)=>`<select id="${id}" ${done?"disabled":""}><option value="">Choose…</option>${opts.map(o=>`<option ${o===val?"selected":""}>${o}</option>`).join("")}</select>`;
+  el.innerHTML = stageFrame(i,
+    `You know Dan's password was stolen at 07:52. But Tarn Valley uses multi-factor authentication (MFA): after the password, staff approve a prompt on their phone. So how did the attacker get in? This is Monday's sign-in log for the staff portal. Click rows to highlight them as you work.`,
+    `<div class="filters">
+      <span class="label">Filter</span>
+      <select id="fAcct" aria-label="Filter by account"><option value="">All accounts</option>${accts.map(x=>`<option ${x===f.acct?"selected":""}>${x}</option>`).join("")}</select>
+      <select id="fRes" aria-label="Filter by result"><option value="">All results</option>${["SUCCESS","FAIL","INFO"].map(x=>`<option ${x===f.res?"selected":""}>${x}</option>`).join("")}</select>
+      <span class="small muted">${rows.length} of ${LOG.length} events</span>
+    </div>
+    <div class="scroll"><table class="log">
+      <thead><tr><th>Time</th><th>Account</th><th>Source IP</th><th>Location</th><th>Event</th><th>Result</th></tr></thead>
+      <tbody>${rows.map(([r,k])=>`<tr data-row="${k}" class="${hl.includes(k)?"hl":""}"><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${esc(r[4])}</td><td class="res ${r[5][0].toLowerCase()}">${r[5]}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <div class="task">
+      <h3>Your findings</h3>
+      <div class="qgrid">
+        <div class="q"><label class="label" for="q2a">Compromised account</label>${sel("q2a",accts,a.acct)}</div>
+        <div class="q"><label class="label" for="q2b">Attacker's IP address</label>${sel("q2b",ips,a.ip)}</div>
+        <div class="q"><label class="label" for="q2c">Attacker's first successful sign-in</label>${sel("q2c",LOG.filter(r=>r[5]==="SUCCESS").map(r=>r[0]),a.time)}</div>
+      </div>
+      <div class="q" style="margin-top:1rem">
+        <span class="label" style="display:block;margin-bottom:.35rem">How did the attacker get past MFA?</span>
+        <div class="radios">
+          ${[["guess","They guessed the 6-digit code after a few attempts"],["fatigue","They kept triggering approval prompts on Dan's phone until he tapped Approve"],["spray","The password spray from Frankfurt switched MFA off"],["disabled","MFA was not turned on for Dan's account"]].map(([v,t])=>`<label class="radio"><input type="radio" name="q2d" id="q2d-${v}" value="${v}" ${a.mfa===v?"checked":""} ${done?"disabled":""}><span>${t}</span></label>`).join("")}
         </div>
       </div>
-      <div class="clock" id="clock">${fmtTime(fRemaining()*1000)}</div>
+      ${!done?`<div class="row" style="margin-top:1rem"><button class="btn primary" id="s2go">Submit findings</button></div>`:""}
+    </div>`);
+  wireFrame(i);
+  $("#fAcct").onchange=e=>{ S.ui.s2f={...f,acct:e.target.value}; keep(); save(); render(); };
+  $("#fRes").onchange=e=>{ S.ui.s2f={...f,res:e.target.value}; keep(); save(); render(); };
+  el.querySelector("tbody").addEventListener("click", e=>{ const tr=e.target.closest("tr[data-row]"); if(!tr) return; const k=+tr.dataset.row; const h=new Set(hl); h.has(k)?h.delete(k):h.add(k); S.ui.s2hl=[...h]; keep(); save(); render(); });
+  function keep(){ if(done) return; S.ui.s2a={acct:$("#q2a").value, ip:$("#q2b").value, time:$("#q2c").value, mfa:(el.querySelector("input[name=q2d]:checked")||{}).value}; }
+  const go=$("#s2go"); if(go) go.onclick=()=>{
+    keep(); save(); const x=S.ui.s2a;
+    if(!x.acct||!x.ip||!x.time||!x.mfa){ feedback("info","Answer all four questions before submitting."); return; }
+    if(check([x.acct,x.ip,x.time,x.mfa].join("|"), "127e538b")) solved(i, `Solved. The attacker already had Dan's password, so each attempt triggered an approval prompt on his phone. He denied three, then approved the fourth, probably to make them stop. This is called MFA fatigue or push bombing. The burst from Frankfurt was an unrelated password spray that failed. Notice what the attacker did next: a mailbox rule to hide invoice emails, then an edit to Northfield Pallets' bank details.`);
+    else { const n=[x.acct==="d.okafor",x.ip==="203.0.113.77",x.time==="08:03:41"].filter(Boolean).length; wrong(i, `Not yet. Your answers are not all correct. Look for one account and one IP address with a run of failures that ends in a success.`); }
+  };
+}
+
+/* =====================================================================
+   STAGE 3: TIMELINE
+   ===================================================================== */
+const TL = {
+  A:"A password spray from Frankfurt fails against several accounts",
+  B:"The phishing email lands in Dan's inbox",
+  C:"Dan types his password into the fake mailbox page",
+  D:"The attacker's first three MFA prompts are denied",
+  E:"The attacker signs in as Dan for the first time",
+  F:"A hidden mailbox rule starts diverting invoice emails",
+  G:"A new account, svc_kestrel, is created",
+  H:"Northfield Pallets' bank details are changed in the payments system"
+};
+const TL_START = ["C","F","A","H","E","B","G","D"];
+const AUDIT = [
+  ["07:44:50","password_reset","it.admin","81.2.69.10","target: k.bello","OK"],
+  ["08:31:06","create_account","d.okafor","203.0.113.77","new user: svc_kestrel · role (from request): admin","OK"],
+  ["08:31:40","set_mfa","svc_kestrel","203.0.113.77","MFA device registered: \"Pixel 7\"","OK"],
+  ["09:40:12","export_report","p.shah","81.2.69.140","report: weekly_payables","OK"]
+];
+function stageTimeline(el){
+  const i=idx("s3"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const order = done ? Object.keys(TL) : (ui.tlord || TL_START);
+  const partA = done || ui.tlok;
+  el.innerHTML = stageFrame(i,
+    `Your manager needs a timeline for the police report and the insurer. Put the attacker's actions in order, using the evidence you have already found and one new piece of evidence: the portal's admin audit log. You can go back to earlier stages from the list at any time.`,
+    `<div class="task" style="margin-top:0">
+      <span class="label">New evidence · Admin audit log, Mon 13 Oct</span>
+      <div class="scroll" style="margin-top:.4rem"><table class="log">
+        <thead><tr><th>Time</th><th>Action</th><th>Performed by</th><th>Source IP</th><th>Details</th><th>Result</th></tr></thead>
+        <tbody>${AUDIT.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${esc(r[4])}</td><td class="res s">${r[5]}</td></tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    <div class="task">
+      <h3>Put the events in order, earliest first</h3>
+      <ol class="order">
+        ${order.map((k,n)=>`<li><span class="n">${n+1}</span><span>${TL[k]}</span>
+          ${!partA?`<span class="mv"><button class="btn" data-up="${n}" aria-label="Move up" ${n===0?"disabled":""}>↑</button><button class="btn" data-down="${n}" aria-label="Move down" ${n===order.length-1?"disabled":""}>↓</button></span>`:""}</li>`).join("")}
+      </ol>
+      ${!partA?`<div class="row" style="margin-top:1rem"><button class="btn primary" id="tlA">Submit timeline</button></div>`:""}
+    </div>
+    ${partA?`<div class="task">
+      <h3>How long did the attacker have between first signing in as Dan and changing the bank details?</h3>
+      <p class="small muted" style="margin-bottom:.6rem">Security teams call this "dwell time". The shorter it is, the less time defenders have to react.</p>
       <div class="row">
-        <button class="btn primary" id="fStart">${F.running?"Pause":"Start"}</button>
-        <button class="btn" id="fAdd">+1 min</button>
-        <button class="btn ghost" id="fReset">Reset to ${mins()} min</button>
+        <select id="tlGap" style="max-width:220px" ${done?"disabled":""}><option value="">Choose…</option>${["19","41","59","82"].map(v=>`<option value="${v}" ${(ui.tlgap===v)||(done&&v==="59")?"selected":""}>${v} minutes</option>`).join("")}</select>
+        ${!done?`<button class="btn primary" id="tlB">Submit</button>`:""}
+      </div>
+    </div>`:""}`);
+  wireFrame(i);
+  el.querySelectorAll("[data-up],[data-down]").forEach(b=>b.onclick=()=>{
+    const o=[...order], n=+(b.dataset.up??b.dataset.down), m=b.dataset.up!==undefined?n-1:n+1;
+    [o[n],o[m]]=[o[m],o[n]]; S.ui.tlord=o; save(); render();
+    const again=el.querySelector(b.dataset.up!==undefined?`[data-up="${m}"]`:`[data-down="${m}"]`); if(again && !again.disabled) again.focus();
+  });
+  const a=$("#tlA"); if(a) a.onclick=()=>{
+    if(check(order.join(","),"782f4d3c")){ S.ui.tlok=true; save(); render(); feedback("info","Correct order. Notice that svc_kestrel was created at 08:31 by d.okafor, an Accounts user who should never be able to create admin accounts. Now one more question."); }
+    else { const right=order.filter((k,n)=>k===Object.keys(TL)[n]).length; wrong(i, `${right} of 8 events are in the right place. The sign-in log in stage 2 and the audit log above give exact times for most of them.`); }
+  };
+  const g=$("#tlGap"); if(g) g.onchange=e=>{ S.ui.tlgap=e.target.value; save(); };
+  const b=$("#tlB"); if(b) b.onclick=()=>{
+    const v=$("#tlGap").value; if(!v){ feedback("info","Choose an answer."); return; }
+    if(check(v,"2f3d49fa")) solved(i, `Solved. From 08:03 to 09:02 is 59 minutes. Nobody noticed the sign-in alert email or the Amsterdam sign-ins in that hour. Real attacks often move this fast, which is why automated detection matters. You will build some in stage 8.`);
+    else wrong(i, "Check the exact times of the attacker's first successful sign-in and the bank details change in the sign-in log.");
+  };
+}
+
+/* =====================================================================
+   STAGE 4: CRYPTO (two notes)
+   ===================================================================== */
+const CIPHER_B64 = "TlNMWVJQIEVTUCBERkFBV1RQQyBNTFlWIE9QRUxUV0QgTVBRWkNQIEVTUCBRQ1RPTEogQUxKWFBZRSBDRlkuIFRRIEVTVEQgWExUV01aSSBURCBXWk5WUE8sIEZEUCBFU1AgTUxOVkZBIExOTlpGWUUgREdOX1ZQREVDUFcuIEVTUCBZUElFIEVMQ1JQRSBURCBUWSBZWkVQIEVIWi4gVEVEIFZQSiBURCBFU1AgWUxYUCBaUSBFU1AgREZBQVdUUEMgSFAgTFdDUExPSiBOU0xZUlBPLCBaWVAgSFpDTy4=";
+const VIG = "FSTHUI BVLQFTVK NTMW ER ZCFKZNLI QXRZJ HU KZMODL. GRFL RMXSRQ. RVELYM XSLF BFML.";
+const ENG = {A:8.2,B:1.5,C:2.8,D:4.3,E:12.7,F:2.2,G:2.0,H:6.1,I:7.0,J:.15,K:.77,L:4.0,M:2.4,N:6.7,O:7.5,P:1.9,Q:.1,R:6.0,S:6.3,T:9.1,U:2.8,V:1.0,W:2.4,X:.15,Y:2.0,Z:.07};
+const shiftText = (t,n) => t.replace(/[A-Z]/g, c=>String.fromCharCode((c.charCodeAt(0)-65-n+26*2)%26+65));
+function vigDecrypt(t, key){
+  const k=(key||"").toUpperCase().replace(/[^A-Z]/g,""); if(!k) return t;
+  let j=0; return t.replace(/[A-Z]/g, c=>{ const s=k.charCodeAt(j++%k.length)-65; return String.fromCharCode((c.charCodeAt(0)-65-s+26)%26+65); });
+}
+function freqChart(text){
+  const counts={}; let tot=0; for(const c of text) if(c>="A"&&c<="Z"){ counts[c]=(counts[c]||0)+1; tot++; }
+  const maxP = Math.max(12.7, ...Object.values(counts).map(v=>v/tot*100||0));
+  return `<div class="legend"><span><i style="background:var(--accent)"></i>Letters in this text</span><span><i style="background:var(--muted);opacity:.45"></i>Typical English</span></div>
+    <div class="freq" role="img" aria-label="Letter frequency chart compared with English">
+    ${"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map(c=>{const p=(counts[c]||0)/tot*100;return `<div class="col"><div class="pair"><div class="b" style="height:${p/maxP*100}%" title="${c}: ${p.toFixed(1)}%"></div><div class="b eng" style="height:${ENG[c]/maxP*100}%"></div></div><span class="l">${c}</span></div>`}).join("")}
+    </div>`;
+}
+function stage3(el){
+  const i=idx("s4"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const decoded = ui.s3dec||done ? atob(CIPHER_B64) : "";
+  const n = done ? 11 : (ui.s3shift||0);
+  const partA = done || ui.s3partA;
+  const vkey = done ? "NORTHFIELD" : (ui.vkey||"");
+  el.innerHTML = stageFrame(i,
+    SHORT ? `While signed in as Dan, the attacker saved a draft email with no recipient. Attackers sometimes leave notes for each other in drafts, because nothing is ever sent. Decode it to find out what the attacker plans next.`
+          : `While signed in as Dan, the attacker saved two draft emails with no recipient. Attackers sometimes leave notes for each other in drafts, because nothing is ever sent. Decode both notes to find out what the attacker plans next.`,
+    `<div class="task" style="margin-top:0">
+      <span class="label">Note 1 · Draft in d.okafor's mailbox · 08:22</span>
+      <div class="cipherbox" style="margin-top:.4rem">${CIPHER_B64}</div>
+    </div>
+    <div class="task panel tool">
+      <h3>Note 1, step 1 · Decode</h3>
+      <p class="small muted">Base64 turns any data into letters, digits, + and /, often padded with = at the end. It is an encoding, not encryption: anyone can reverse it without a key.</p>
+      <div class="row"><button class="btn ${decoded?"":"primary"}" id="decBtn" ${decoded?"disabled":""}>${decoded?"Decoded from Base64":"Decode Base64"}</button></div>
+      ${decoded?`<div class="cipherbox">${esc(decoded)}</div>`:""}
+    </div>
+    ${decoded?`
+    <div class="task panel tool">
+      <h3>Note 1, step 2 · Break the cipher</h3>
+      <p class="small muted">The spaces and punctuation survived, so this looks like a Caesar cipher: every letter moved the same number of places along the alphabet. Compare the letter frequencies with normal English, then shift back.</p>
+      ${freqChart(decoded)}
+      <div class="shift">
+        <label class="label" for="shiftR">Shift back by</label>
+        <input type="range" id="shiftR" min="0" max="25" value="${n}" ${done?"disabled":""}>
+        <span class="val" id="shiftV">${n}</span>
+      </div>
+      <div class="cipherbox" id="plain">${esc(shiftText(decoded,n))}</div>
+    </div>
+    <div class="task">
+      <h3>What is the name of the backup account the attacker plans to use?</h3>
+      <div class="row">
+        <input type="text" id="s3ans" style="max-width:320px" autocomplete="off" spellcheck="false" placeholder="Account name" value="${done||partA?"svc_kestrel":esc(ui.s3ans||"")}" ${partA?"disabled":""}>
+        ${!partA?`<button class="btn primary" id="s3go">Submit</button>`:SHORT?"":`<span class="pill ok">Correct</span>`}
+      </div>
+    </div>`:""}
+    ${partA && !SHORT?`
+    <div class="task" style="margin-top:2rem">
+      <span class="label">Note 2 · Draft in d.okafor's mailbox · 08:24</span>
+      <div class="cipherbox" style="margin-top:.4rem">${VIG}</div>
+    </div>
+    <div class="task panel tool">
+      <h3>Note 2 · A stronger cipher</h3>
+      <p class="small muted">Try the Caesar approach on this one and it fails. This is a Vigenère cipher: each letter of a secret keyword gives a different shift, and the keyword repeats along the message. The same plain letter can become different cipher letters, which flattens the frequency chart. Note 1 tells you what the keyword is.</p>
+      ${freqChart(VIG)}
+      <div>
+        <label class="label" for="vkey">Keyword</label>
+        <input type="text" id="vkey" style="max-width:320px;font-family:var(--f-mono);text-transform:uppercase" autocomplete="off" spellcheck="false" placeholder="Type a keyword" value="${esc(vkey)}" ${done?"disabled":""}>
+      </div>
+      <div class="cipherbox" id="vplain">${esc(vigDecrypt(VIG, vkey))}</div>
+    </div>
+    <div class="task">
+      <h3>Which supplier does the attacker plan to target next?</h3>
+      <div class="row">
+        <input type="text" id="s3b" style="max-width:320px" autocomplete="off" spellcheck="false" placeholder="Supplier name" value="${done?"Moorside Fuels":esc(ui.s3b||"")}" ${done?"disabled":""}>
+        ${!done?`<button class="btn primary" id="s3bgo">Submit</button>`:""}
+      </div>
+    </div>`:""}`);
+  wireFrame(i);
+  const d=$("#decBtn"); if(d) d.onclick=()=>{ S.ui.s3dec=true; save(); render(); };
+  const r=$("#shiftR"); if(r) r.oninput=e=>{ const v=+e.target.value; S.ui.s3shift=v; $("#shiftV").textContent=v; $("#plain").textContent=shiftText(decoded,v); save(); };
+  const inp=$("#s3ans"); if(inp && !partA) inp.oninput=e=>{ S.ui.s3ans=e.target.value; save(); };
+  const go=$("#s3go"); if(go) go.onclick=()=>{
+    const v=(inp.value||"").trim().toLowerCase().replace(/\s+/g,"");
+    if(!v){ feedback("info","Type the account name first."); return; }
+    if((check(v,"ca2ade43")||check(v,"ca3fb57a")) && SHORT){ S.ui.s3partA=true; solved(i, `Solved. The shift was 11, so E had become P. The note says the attacker plans to change more bank details before Friday's payment run and has a backup account, <span class="mono">svc_kestrel</span>, in case Dan's mailbox is locked. Someone created that account on Monday. The next stage finds out how.`); }
+    else if(check(v,"ca2ade43")||check(v,"ca3fb57a")){ S.ui.s3partA=true; save(); render(); feedback("info",`Correct. The shift was 11, so E had become P. The note also says the next target is in note 2, locked with a one-word key: the supplier they already changed. Scroll down.`); }
+    else wrong(i, "That is not the account name in the note. Make sure the whole message reads as plain English first.");
+  };
+  const vk=$("#vkey"); if(vk && !done) vk.oninput=e=>{ S.ui.vkey=e.target.value; $("#vplain").textContent=vigDecrypt(VIG,e.target.value); save(); };
+  const b=$("#s3b"); if(b && !done) b.oninput=e=>{ S.ui.s3b=e.target.value; save(); };
+  const bg=$("#s3bgo"); if(bg) bg.onclick=()=>{
+    const v=(b.value||"").trim().toLowerCase().replace(/[^a-z]/g,"");
+    if(!v){ feedback("info","Type the supplier's name first."); return; }
+    if(check(v,"482d6fef")||check(v,"20be5476")) solved(i, `Solved. The keyword was NORTHFIELD. The attacker plans a second fake payment to Moorside Fuels on Friday, so Tarn Valley can warn them and the bank before it happens. Vigenère was considered unbreakable for 300 years, but a repeating keyword still leaves patterns. Modern ciphers such as AES leave none.`);
+    else wrong(i, "That is not the supplier in note 2. If the text is still scrambled, check the keyword: it is one word, the first part of the supplier's name from stage 1.");
+  };
+}
+
+/* =====================================================================
+   STAGE 6: PASSWORDS AND HASHING
+   ===================================================================== */
+const PRIMES=[];for(let n=2;PRIMES.length<64;n++){if(PRIMES.every(p=>n%p))PRIMES.push(n)}
+const SHA_K=PRIMES.map(p=>Math.floor((Math.pow(p,1/3)%1)*4294967296)|0);
+const SHA_H=PRIMES.slice(0,8).map(p=>Math.floor((Math.sqrt(p)%1)*4294967296)|0);
+function sha256(str){
+  const b=new TextEncoder().encode(str),l=b.length,n=((l+9+63)>>6)<<6,m=new Uint8Array(n);m.set(b);m[l]=0x80;
+  const dv=new DataView(m.buffer);dv.setUint32(n-4,(l*8)>>>0);dv.setUint32(n-8,Math.floor(l*8/4294967296));
+  const H=SHA_H.slice(),w=new Int32Array(64),r=(x,k)=>(x>>>k)|(x<<(32-k));
+  for(let o=0;o<n;o+=64){
+    for(let t=0;t<16;t++)w[t]=dv.getInt32(o+t*4);
+    for(let t=16;t<64;t++){const a=w[t-15],c=w[t-2];w[t]=(w[t-16]+(r(a,7)^r(a,18)^(a>>>3))+w[t-7]+(r(c,17)^r(c,19)^(c>>>10)))|0}
+    let [a,bb,c,d,e,f,g,h]=H;
+    for(let t=0;t<64;t++){const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+SHA_K[t]+w[t])|0,t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&c)^(bb&c)))|0;h=g;g=f;f=e;e=(d+t1)|0;d=c;c=bb;bb=a;a=(t1+t2)|0}
+    H[0]=(H[0]+a)|0;H[1]=(H[1]+bb)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;
+  }
+  return H.map(x=>(x>>>0).toString(16).padStart(8,"0")).join("");
+}
+const STAFF_HASHES = [
+  ["p.shah","2d4c581e556c8edbd4fbdf7d0832d55922658105c54100eb95028e207e0b166f"],
+  ["j.mercer","a74adc8fcae1dc7cbae75d546b13948dcc49202eb202b2690542cb290b7afc9a"],
+  ["d.okafor","4fde14a7b5e32f830800eacc33d9e8ceff9bca1d192481b1e4a3d6a09a5cc2eb"],
+  ["k.bello","0fca4c0ffbe4689d6f2ea5c0934cd7a71e8fc52a54c31434aa12ca4a9aa9ec44"],
+  ["m.ruiz","07988a4a0231a117f7030d7e8db53c9d2f2be0717d72b0200543bb37d99e7af7"],
+  ["t.hughes","a74adc8fcae1dc7cbae75d546b13948dcc49202eb202b2690542cb290b7afc9a"]
+];
+const COMMON = ["password","password1","password123","123456","12345678","qwerty","qwerty123","letmein","welcome","welcome1","iloveyou","football","monkey","dragon","sunshine","abc123","111111","admin","liverpool1","arsenal1","chelsea1","princess","baseball","trustno1"];
+const RANK_ITEMS = [["r1","Tr4ct0r!"],["r2","kettle-violin-harbour-42"],["r3","Password1"],["r4","Bl4ck-Sh33p"]];
+function strength(pw){
+  let pool=0; if(/[a-z]/.test(pw)) pool+=26; if(/[A-Z]/.test(pw)) pool+=26; if(/[0-9]/.test(pw)) pool+=10; if(/[^A-Za-z0-9]/.test(pw)) pool+=33;
+  const bits = pw.length && pool ? pw.length*Math.log2(pool) : 0;
+  return { pool, bits, common: COMMON.includes(pw.toLowerCase()) };
+}
+function hashDiff(h1,h2){ let n=0; const out=[...h1].map((c,k)=>{ const d=c!==h2[k]; if(d) n++; return d?`<mark>${c}</mark>`:c; }).join(""); return {html:out, n}; }
+function stagePw(el){
+  const i=idx("s6"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const P = ui.pw || {};
+  const a1 = ui.pwA ?? "Pennine2026", a2 = ui.pwB ?? "pennine2026";
+  const h1 = sha256(a1), h2 = sha256(a2), hd = hashDiff(h2,h1);
+  const salt1 = "x7Qp", salt2 = "L2fa";
+  const sp = ui.pwS ?? "";
+  const s = strength(sp);
+  const pp = P.pair || [];
+  const rk = ui.pwR || {};
+  const solvedTag = k => (done||P[k]) ? `<span class="pill ok">Solved</span>` : "";
+  el.innerHTML = stageFrame(i,
+    `The code review showed that the portal kept passwords in plain text, so anyone who stole the database could read them all. The developers want to switch to hashing. Before they do, they want you to check that everyone understands how hashing works and to review the staff password policy. There are three parts.`,
+    `<div class="task panel tool">
+      <div class="row" style="justify-content:space-between"><h3>Part 1 · The hash lab</h3>${solvedTag("p1")}</div>
+      <p class="small muted">A hash function turns any input into a fixed-length fingerprint. SHA-256 always gives 64 hexadecimal characters. It is one-way: you can't run it backwards to get the input. Try changing the inputs.</p>
+      <div class="hashpair">
+        <div><label class="label" for="pwA">Input A</label><input type="text" id="pwA" value="${esc(a1)}" autocomplete="off" spellcheck="false"><div class="hash" id="hA">${h1}</div></div>
+        <div><label class="label" for="pwB">Input B</label><input type="text" id="pwB" value="${esc(a2)}" autocomplete="off" spellcheck="false"><div class="hash" id="hB">${hd.html}</div></div>
+      </div>
+      <p class="small" id="hN"><b>${hd.n}</b> of 64 characters differ between the two hashes.</p>
+      <div class="saltdemo">
+        <span class="label">Salting</span>
+        <p class="small muted">A salt is a random value stored next to each user's hash and mixed in before hashing. Here, two users have both chosen Pennine2026, but each has a different salt.</p>
+        <div class="scroll"><table class="log" style="min-width:560px"><thead><tr><th>User</th><th>Salt</th><th>SHA-256(salt + password)</th></tr></thead><tbody>
+          <tr><td>user 1</td><td>${salt1}</td><td>${sha256(salt1+"Pennine2026").slice(0,40)}…</td></tr>
+          <tr><td>user 2</td><td>${salt2}</td><td>${sha256(salt2+"Pennine2026").slice(0,40)}…</td></tr>
+        </tbody></table></div>
+      </div>
+      <div class="q"><p style="font-weight:600;margin-bottom:.45rem">When you change a single character of the input, what happens to the hash?</p><div class="radios">
+        ${[["a","Only one character of the hash changes"],["b","Roughly half the characters change, with no visible pattern"],["c","Nothing changes unless the input gets longer"]].map(([v,t])=>`<label class="radio"><input type="radio" name="pw1" id="pw1-${v}" value="${v}" ${(P.q1===v)||((done||P.p1)&&v==="b")?"checked":""} ${done||P.p1?"disabled":""}><span>${t}</span></label>`).join("")}
+      </div></div>
+      <div class="q"><p style="font-weight:600;margin-bottom:.45rem">Why give every user their own salt?</p><div class="radios">
+        ${[["a","It makes passwords longer to type"],["b","It lets administrators decrypt passwords when staff forget them"],["c","Identical passwords no longer produce identical hashes, so a stolen table reveals much less"]].map(([v,t])=>`<label class="radio"><input type="radio" name="pw2" id="pw2-${v}" value="${v}" ${(P.q2===v)||((done||P.p1)&&v==="c")?"checked":""} ${done||P.p1?"disabled":""}><span>${t}</span></label>`).join("")}
+      </div></div>
+      ${!(done||P.p1)?`<div class="row"><button class="btn primary" id="pwGo1">Submit part 1</button></div>`:""}
+    </div>
+
+    <div class="task panel tool">
+      <div class="row" style="justify-content:space-between"><h3>Part 2 · Spot the shared password</h3>${solvedTag("p2")}</div>
+      <p class="small muted">For a quick test, a developer hashed the six Accounts passwords with SHA-256 but no salt. You can't see anyone's password, yet the table still leaks something. Which two members of staff are using the same password?</p>
+      <div class="scroll"><table class="log" style="min-width:640px"><thead><tr><th></th><th>User</th><th>SHA-256(password), no salt</th></tr></thead><tbody>
+        ${STAFF_HASHES.map(([u,h])=>`<tr><td><input type="checkbox" id="pair-${u.replace(".","_")}" value="${u}" aria-label="${u}" ${pp.includes(u)||((done||P.p2)&&["j.mercer","t.hughes"].includes(u))?"checked":""} ${done||P.p2?"disabled":""}></td><td>${u}</td><td style="white-space:normal;word-break:break-all">${h}</td></tr>`).join("")}
+      </tbody></table></div>
+      ${!(done||P.p2)?`<div class="row"><button class="btn primary" id="pwGo2">Submit part 2</button></div>`:""}
+    </div>
+
+    <div class="task panel tool">
+      <div class="row" style="justify-content:space-between"><h3>Part 3 · Rate the passwords</h3>${solvedTag("p3")}</div>
+      <p class="small muted">A common estimate of password strength is <span class="mono">length × log₂(pool)</span> bits, where the pool is the number of possible characters: 26 lower-case, 26 upper-case, 10 digits and about 33 symbols. Each extra bit doubles the number of possibilities. But the formula assumes characters are random. Passwords that appear in lists of common passwords are the first ones anyone would try.</p>
+      <div>
+        <label class="label" for="pwS">Strength checker</label>
+        <input type="text" id="pwS" value="${esc(sp)}" placeholder="Type any example password (not a real one)" autocomplete="off" spellcheck="false" style="max-width:420px">
+        <div class="meterline" id="pwMeter">${meterHtml(s, sp)}</div>
+      </div>
+      <p style="font-weight:600;margin-top:.5rem">Rank these four from 1 (weakest) to 4 (strongest).</p>
+      <div class="rankgrid">
+        ${RANK_ITEMS.map(([k,pw])=>`<label class="rankrow" for="rank-${k}"><span class="mono">${esc(pw)}</span><select id="rank-${k}" data-rank="${k}" ${done||P.p3?"disabled":""}><option value="">Rank…</option>${[1,2,3,4].map(n=>`<option ${(rk[k]==n)||((done||P.p3)&&({r1:2,r2:4,r3:1,r4:3})[k]===n)?"selected":""}>${n}</option>`).join("")}</select></label>`).join("")}
+      </div>
+      ${!(done||P.p3)?`<div class="row"><button class="btn primary" id="pwGo3">Submit part 3</button></div>`:""}
+    </div>`);
+  wireFrame(i);
+  const upd=()=>{ const x=$("#pwA").value, y=$("#pwB").value; S.ui.pwA=x; S.ui.pwB=y; save();
+    const g1=sha256(x), g2=sha256(y), df=hashDiff(g2,g1); $("#hA").textContent=g1; $("#hB").innerHTML=df.html; $("#hN").innerHTML=`<b>${df.n}</b> of 64 characters differ between the two hashes.`; };
+  $("#pwA").oninput=upd; $("#pwB").oninput=upd;
+  $("#pwS").oninput=e=>{ S.ui.pwS=e.target.value; save(); $("#pwMeter").innerHTML=meterHtml(strength(e.target.value), e.target.value); };
+  el.querySelectorAll("[data-rank]").forEach(sel=>sel.onchange=()=>{ S.ui.pwR={...(S.ui.pwR||{}), [sel.dataset.rank]:sel.value}; save(); });
+  el.querySelectorAll("input[name=pw1],input[name=pw2]").forEach(x=>x.onchange=()=>{ S.ui.pw={...(S.ui.pw||{}), q1:(el.querySelector("input[name=pw1]:checked")||{}).value, q2:(el.querySelector("input[name=pw2]:checked")||{}).value}; save(); });
+  el.querySelectorAll("input[id^=pair-]").forEach(x=>x.onchange=()=>{ S.ui.pw={...(S.ui.pw||{}), pair:[...el.querySelectorAll("input[id^=pair-]:checked")].map(c=>c.value)}; save(); });
+  const finishPart = (k, msg) => {
+    S.ui.pw={...(S.ui.pw||{}), [k]:true}; save();
+    const Q=S.ui.pw;
+    if(Q.p1&&Q.p2&&Q.p3) solved(i, `Solved. In practice, passwords are stored with a unique salt and a deliberately slow hash designed for passwords, such as bcrypt or Argon2. That makes each guess slow for anyone who steals the database. Long passphrases of random words beat short "clever" substitutions, and any password on a common list is weak however complex it looks.`);
+    else { render(); feedback("info", msg); }
+  };
+  const g1=$("#pwGo1"); if(g1) g1.onclick=()=>{
+    const Q=S.ui.pw||{}; if(!Q.q1||!Q.q2){ feedback("info","Answer both questions in part 1."); return; }
+    if(check(Q.q1+"|"+Q.q2,"7fcef1df")) finishPart("p1","Part 1 solved. Tiny changes to the input scramble the whole hash. This is called the avalanche effect.");
+    else wrong(i,"At least one answer in part 1 is wrong. Experiment with the two inputs and look at the salting table again.");
+  };
+  const g2=$("#pwGo2"); if(g2) g2.onclick=()=>{
+    const pr=[...(S.ui.pw||{}).pair||[]].sort(); if(pr.length!==2){ feedback("info","Tick exactly two members of staff."); return; }
+    if(check(pr.join(","),"f2a9d3cc")) finishPart("p2","Part 2 solved. Their hashes are identical, so their passwords are identical. If one of them is ever guessed, both accounts fall. Salting would have hidden this.");
+    else wrong(i,"Those two hashes are different. Compare the first few characters of every hash.");
+  };
+  const g3=$("#pwGo3"); if(g3) g3.onclick=()=>{
+    const R=S.ui.pwR||{}; const v=RANK_ITEMS.map(([k])=>R[k]||"");
+    if(v.some(x=>!x)){ feedback("info","Give every password a rank."); return; }
+    if(new Set(v).size!==4){ feedback("info","Use each rank from 1 to 4 once."); return; }
+    if(check(v.join(","),"cc6b5060")) finishPart("p3","Part 3 solved. By the formula alone, Password1 looks stronger than Tr4ct0r!, but it is on every common-password list, so it would be tried almost immediately.");
+    else wrong(i,"Not quite. Put each password into the strength checker, and remember what the checker says about common passwords.");
+  };
+}
+function meterHtml(s, pw){
+  if(!pw) return `<span class="small muted">The estimate appears here.</span>`;
+  const bits = s.common ? 0 : s.bits;
+  const pct = Math.min(100, bits/100*100);
+  const cls = s.common||bits<45 ? "bad" : bits<70 ? "warn" : "ok";
+  return `<div class="meter"><i class="${cls}" style="width:${Math.max(4,pct)}%"></i></div>
+    <span class="small mono">${pw.length} chars · pool ${s.pool} · ${s.common?`<b style="color:var(--bad)">on the common-password list, so effectively 0 bits</b>`:`about ${Math.round(s.bits)} bits`}</span>`;
+}
+
+/* =====================================================================
+   STAGE 7: FIREWALL
+   ===================================================================== */
+const FW_SRC = [["any","Any address"],["81.2.69.0/24","81.2.69.0/24 (office)"],["203.0.113.77","203.0.113.77"],["198.51.100.23","198.51.100.23"]];
+const FW_PORT = [["any","Any port"],["443","443 (HTTPS portal)"],["22","22 (SSH admin)"]];
+const FW_DEFAULT = [{a:"allow",src:"any",port:"443"},{a:"deny",src:"203.0.113.77",port:"any"},{a:"allow",src:"any",port:"any"},{a:"",src:"any",port:"any"},{a:"",src:"any",port:"any"}];
+const PACKETS = [
+  ["81.2.69.142","443","Dan at his office desk","allow"],
+  ["203.0.113.77","443","Attacker, portal","deny"],
+  ["198.51.100.23","443","Password sprayer, portal","deny"],
+  ["81.2.69.140","22","IT admin in the office","allow"],
+  ["203.0.113.77","22","Attacker, SSH","deny"],
+  ["192.0.2.55","443","Priya working from home","allow"],
+  ["192.0.2.55","22","SSH from a home broadband line","deny"],
+  ["81.2.69.150","3389","Remote desktop from the office","deny"]
+];
+function fwMatch(rule, ip, port){
+  if(!rule.a) return false;
+  const srcOk = rule.src==="any" || (rule.src==="81.2.69.0/24" ? ip.startsWith("81.2.69.") : ip===rule.src);
+  const portOk = rule.port==="any" || rule.port===port;
+  return srcOk && portOk;
+}
+function fwEval(rules, ip, port){ for(let k=0;k<rules.length;k++){ if(fwMatch(rules[k],ip,port)) return {act:rules[k].a, rule:k+1}; } return {act:"deny", rule:0}; }
+function stageFw(el){
+  const i=idx("s7"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const rules = ui.fw || FW_DEFAULT.map(r=>({...r}));
+  const res = PACKETS.map(p=>({p, r:fwEval(rules,p[0],p[1])}));
+  const passes = res.filter(x=>x.r.act===x.p[3]).length;
+  const allOk = passes===PACKETS.length;
+  if(allOk && !ui.fwok){ ui.fwok=true; save(); }
+  const opt=(list,v)=>list.map(([k,t])=>`<option value="${k}" ${k===v?"selected":""}>${t}</option>`).join("");
+  el.innerHTML = stageFrame(i,
+    `Tarn Valley's firewall sits between the internet and the portal. The current rules are wrong: they let the attacker straight back in. Rewrite them to match the security policy below. The firewall checks rules from the top and stops at the first rule that matches. If no rule matches, the traffic is blocked.`,
+    `<div class="panel" style="margin-bottom:1rem">
+      <span class="label">Security policy</span>
+      <ul class="policy">
+        <li>Staff must reach the portal (HTTPS, port 443) from anywhere, including home.</li>
+        <li>Both attacker addresses, 203.0.113.77 and 198.51.100.23, must be blocked completely.</li>
+        <li>Remote administration (SSH, port 22) is allowed only from the office network, 81.2.69.0/24.</li>
+        <li>Everything else is blocked.</li>
+      </ul>
+    </div>
+    <div class="scroll"><table class="fw">
+      <thead><tr><th>#</th><th>Action</th><th>Source</th><th>Port</th><th>Order</th></tr></thead>
+      <tbody>${rules.map((r,k)=>`<tr class="${r.a?"":"off"}">
+        <td class="mono">${k+1}</td>
+        <td><select id="fw-a-${k}" data-k="${k}" data-f="a" aria-label="Rule ${k+1} action" ${done?"disabled":""}><option value="" ${!r.a?"selected":""}>(rule off)</option><option value="allow" ${r.a==="allow"?"selected":""}>Allow</option><option value="deny" ${r.a==="deny"?"selected":""}>Deny</option></select></td>
+        <td><select id="fw-s-${k}" data-k="${k}" data-f="src" aria-label="Rule ${k+1} source" ${done?"disabled":""}>${opt(FW_SRC,r.src)}</select></td>
+        <td><select id="fw-p-${k}" data-k="${k}" data-f="port" aria-label="Rule ${k+1} port" ${done?"disabled":""}>${opt(FW_PORT,r.port)}</select></td>
+        <td><span class="mv"><button class="btn" data-fwup="${k}" aria-label="Move rule ${k+1} up" ${k===0||done?"disabled":""}>↑</button><button class="btn" data-fwdown="${k}" aria-label="Move rule ${k+1} down" ${k===rules.length-1||done?"disabled":""}>↓</button></span></td>
+      </tr>`).join("")}
+      <tr class="off"><td class="mono">–</td><td colspan="4" class="small">Default: deny anything no rule matched</td></tr>
+      </tbody>
+    </table></div>
+    <div class="task">
+      <div class="row" style="justify-content:space-between;margin-bottom:.5rem"><h3>Test traffic</h3><span class="pill ${allOk?"ok":"sev"}">${passes} of ${PACKETS.length} handled correctly</span></div>
+      <div class="scroll"><table class="log">
+        <thead><tr><th>From</th><th>Port</th><th>Who</th><th>Should be</th><th>Firewall does</th><th>Matched</th></tr></thead>
+        <tbody>${res.map(({p,r})=>`<tr><td>${p[0]}</td><td>${p[1]}</td><td style="font-family:var(--f-body)">${p[2]}</td><td>${p[3].toUpperCase()}</td><td class="res ${r.act===p[3]?"s":"f"}">${r.act.toUpperCase()} ${r.act===p[3]?"✓":"✗"}</td><td>${r.rule?"rule "+r.rule:"default"}</td></tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    ${(ui.fwok||done)?`<div class="task">
+      <h3>Why isn't blocking 203.0.113.77 enough on its own?</h3>
+      <div class="radios">
+        ${[["a","Firewalls can't block individual IP addresses"],["b","The attacker can switch to a new IP address in minutes, so the MFA, code and training fixes matter more"],["c","The address belongs to Dan, so blocking it would lock him out"]].map(([v,t])=>`<label class="radio"><input type="radio" name="fwq" id="fwq-${v}" value="${v}" ${(ui.fwq===v)||(done&&v==="b")?"checked":""} ${done?"disabled":""}><span>${t}</span></label>`).join("")}
+      </div>
+      ${!done?`<div class="row" style="margin-top:1rem"><button class="btn primary" id="fwGo">Submit</button></div>`:""}
+    </div>`:`<p class="small muted" style="margin-top:1rem">A question unlocks when all eight test packets are handled correctly.</p>`}`);
+  wireFrame(i);
+  el.querySelectorAll("select[data-k]").forEach(sel=>sel.onchange=()=>{ const r=rules.map(x=>({...x})); r[+sel.dataset.k][sel.dataset.f]=sel.value; S.ui.fw=r; save(); render(); const again=$("#"+sel.id); if(again) again.focus(); });
+  el.querySelectorAll("[data-fwup],[data-fwdown]").forEach(b=>b.onclick=()=>{ const r=rules.map(x=>({...x})); const n=+(b.dataset.fwup??b.dataset.fwdown), m=b.dataset.fwup!==undefined?n-1:n+1; [r[n],r[m]]=[r[m],r[n]]; S.ui.fw=r; save(); render(); });
+  el.querySelectorAll("input[name=fwq]").forEach(x=>x.onchange=()=>{ S.ui.fwq=x.value; save(); });
+  const go=$("#fwGo"); if(go) go.onclick=()=>{
+    const v=S.ui.fwq; if(!v){ feedback("info","Choose an answer."); return; }
+    if(check(v,"6519afbe")) solved(i, `Solved. Order matters: an "Allow any, port 443" rule above the blocks would let the attacker through before the deny rules were ever checked. Blocking known bad addresses is quick and worth doing, but attackers rent new servers cheaply. Defence in depth means several layers, so one failure isn't fatal.`);
+    else wrong(i, "Think about how hard it is for an attacker to get a different IP address.");
+  };
+}
+
+/* =====================================================================
+   STAGE 9: RESPOND
+   ===================================================================== */
+const BUCKETS = [["n","Now: in the first hour"],["w","This week"],["l","Longer term"],["x","Don't do this"]];
+const ACTIONS = [
+  ["k1","Disable the svc_kestrel account"],
+  ["k2","Sign Dan out on every device and reset his password"],
+  ["k3","Delete the hidden mailbox rule"],
+  ["k4","Call the bank about the £48,200 and warn Moorside Fuels"],
+  ["k5","Release the three code fixes from stage 5"],
+  ["k6","Block the two attacker IP addresses at the firewall"],
+  ["k7","Turn on MFA number matching for every member of staff"],
+  ["k8","Review every bank-detail change made in the past month"],
+  ["k9","Run phishing awareness training for all staff"],
+  ["k10","Require a phone call to a known number before any bank details change"],
+  ["k11","Tune and switch on the sign-in detection model"],
+  ["k12","Give Dan a formal warning and name him in the staff newsletter"],
+  ["k13","Delete the logs now that the incident is over, to save space"]
+];
+function stageRespond(el){
+  const i=idx("s9"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const pick = ui.rsp || {};
+  const ANS = "nnnnwnwwlllxx";
+  el.innerHTML = stageFrame(i,
+    `You now understand the whole incident. The directors want a response plan by the end of the day. Sort each action into when it should happen, or whether it should happen at all.`,
+    `<div class="actions">
+      ${ACTIONS.map(([k,t],n)=>`<div class="action"><span>${t}</span>
+        <select id="rsp-${k}" data-rsp="${k}" aria-label="When: ${esc(t)}" ${done?"disabled":""}><option value="">When?</option>${BUCKETS.map(([b,bt])=>`<option value="${b}" ${(pick[k]===b)||(done&&ANS[n]===b)?"selected":""}>${bt}</option>`).join("")}</select></div>`).join("")}
+    </div>
+    ${!done?`<div class="row task"><button class="btn primary" id="rspGo">Submit plan</button><span class="small muted" id="rspCount">${Object.values(pick).filter(Boolean).length} of ${ACTIONS.length} sorted</span></div>`:""}`);
+  wireFrame(i);
+  el.querySelectorAll("[data-rsp]").forEach(sel=>sel.onchange=()=>{ S.ui.rsp={...(S.ui.rsp||{}), [sel.dataset.rsp]:sel.value}; save(); const c=$("#rspCount"); if(c) c.textContent=`${Object.values(S.ui.rsp).filter(Boolean).length} of ${ACTIONS.length} sorted`; });
+  const go=$("#rspGo"); if(go) go.onclick=()=>{
+    const p=S.ui.rsp||{}; const v=ACTIONS.map(([k])=>p[k]||"").join("");
+    if(v.length!==ACTIONS.length){ feedback("info","Sort every action first."); return; }
+    if(check(v,"018d3c11")) solved(i, `Solved. First contain the attacker and protect the money. Then fix the root causes. Then make the organisation harder to fool next time. Blaming one person discourages staff from reporting mistakes quickly, and the logs are evidence the police and insurer will need.`);
+    else { const right=[...v].filter((c,n)=>c===ANS[n]).length; wrong(i, `${right} of ${ACTIONS.length} actions are in the right place. Ask of each one: does it stop the attacker right now, fix what let them in, or prevent a repeat?`); }
+  };
+}
+
+/* =====================================================================
+   STAGE 5: SECURE CODE
+   ===================================================================== */
+const CODE = [
+  `<span class="kw">from</span> portal <span class="kw">import</span> db, push, audit, session, hash_password, verify_hash`,
+  ``,
+  `<span class="kw">def</span> sign_in(username, password):`,
+  `    user = db.find_user(username)`,
+  `    <span class="kw">if</span> user <span class="kw">is None</span>:`,
+  `        <span class="kw">return</span> fail(<span class="str">"Incorrect username or password"</span>)`,
+  `    <span class="kw">if</span> password != user.password:`,
+  `        audit.log(<span class="str">"bad_password"</span>, username)`,
+  `        <span class="kw">return</span> fail(<span class="str">"Incorrect username or password"</span>)`,
+  `    <span class="cm"># Second factor: ask the user to approve on their phone</span>`,
+  `    push.send_approval(user.phone)`,
+  `    <span class="kw">if</span> push.wait_for_approval(user.phone, timeout=60):`,
+  `        session.start(user)`,
+  `        <span class="kw">return</span> ok()`,
+  `    <span class="kw">return</span> fail(<span class="str">"Sign-in not approved"</span>)`,
+  ``,
+  `<span class="kw">def</span> create_account(request):`,
+  `    role = request.form.get(<span class="str">"role"</span>)`,
+  `    <span class="kw">if</span> role != <span class="str">"admin"</span>:`,
+  `        <span class="kw">return</span> forbidden()`,
+  `    new = db.add_user(request.form[<span class="str">"username"</span>], hash_password(request.form[<span class="str">"password"</span>]))`,
+  `    audit.log(<span class="str">"account_created"</span>, new.username)`,
+  `    <span class="kw">return</span> ok()`
+];
+const FIXES = [
+  { line:7, title:"Line 7 compares the typed password with a stored plain-text password.", opts:[
+      ["a","Compare lower-case versions of both so typing errors don't count"],
+      ["b","Store only a salted hash and check it with verify_hash(password, user.password_hash)"],
+      ["c","Encode the stored password with Base64 so it can't be read"]]},
+  { line:11, title:"Line 11 sends an approval prompt every time the password is correct, with no limit.", opts:[
+      ["a","Send two prompts each time so the user notices"],
+      ["b","Only send prompts during office hours"],
+      ["c","Limit prompts to 3 per 10 minutes, alert IT when the limit is hit, and make the user type a number shown on screen"]]},
+  { line:18, title:"Line 18 decides who is an admin using a value sent by the user's own browser.", opts:[
+      ["a","Check the role stored on the server for the signed-in user, such as session.user.role"],
+      ["b","Hide the role field on the form with CSS"],
+      ["c","Rename the field from role to r so attackers can't guess it"]]}
+];
+function stage4(el){
+  const i=idx("s5"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  const marked = new Set(ui.s4lines||[]);
+  const phase2 = done || ui.s4phase2;
+  const fx = ui.s4fix || {};
+  el.innerHTML = stageFrame(i,
+    `The development team has sent you the portal's sign-in and account code. Three flaws in it made this attack possible: the stolen password, the MFA fatigue and the attacker creating svc_kestrel for themselves. Find them.`,
+    `<div class="code" role="group" aria-label="Portal source code, click lines to mark them">
+      <ol>${CODE.map((c,k)=>`<li tabindex="${phase2?-1:0}" data-ln="${k+1}" aria-pressed="${marked.has(k+1)||(done&&[7,11,18].includes(k+1))}"><span class="ln">${k+1}</span><span>${c||" "}</span></li>`).join("")}</ol>
+    </div>
+    ${!phase2?`<div class="task row"><button class="btn primary" id="s4a">Submit ${marked.size} marked line${marked.size===1?"":"s"}</button><span class="small muted">Click or press Enter on a line to mark it as vulnerable. Mark exactly three.</span></div>`:`
+    <div class="task">
+      <h3>Choose the right fix for each flaw</h3>
+      <div class="fixes">
+        ${FIXES.map((f,k)=>`<div class="q"><p style="font-weight:600;margin-bottom:.45rem">${f.title}</p><div class="radios">${f.opts.map(([v,t])=>`<label class="radio"><input type="radio" name="fix${k}" id="fix${k}-${v}" value="${v}" ${(fx[k]===v)||(done&&"bca"[k]===v)?"checked":""} ${done?"disabled":""}><span>${t}</span></label>`).join("")}</div></div>`).join("")}
+      </div>
+      ${!done?`<div class="row" style="margin-top:1rem"><button class="btn primary" id="s4b">Submit fixes</button></div>`:""}
+    </div>`}`);
+  wireFrame(i);
+  if(!phase2){
+    const toggle = li=>{ const n=+li.dataset.ln; marked.has(n)?marked.delete(n):marked.add(n); S.ui.s4lines=[...marked]; save(); render(); const again=el.querySelector(`li[data-ln="${n}"]`); if(again) again.focus(); };
+    el.querySelectorAll(".code li").forEach(li=>{ li.onclick=()=>toggle(li); li.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(li);} }; });
+    $("#s4a").onclick=()=>{
+      const lines=[...marked].sort((a,b)=>a-b);
+      if(lines.length!==3){ feedback("info","Mark exactly three lines."); return; }
+      if(check(lines.join(","),"bffeaed2")){ S.ui.s4phase2=true; save(); render(); feedback("info","Correct, those are the three flaws. Now choose how to fix each one."); }
+      else { const hit=lines.filter(n=>[7,11,18].includes(n)).length; wrong(i, `${hit} of your 3 lines ${hit===1?"is":"are"} right. Lines 6 and 9 give the same message whether the username or the password is wrong. That is good practice, because it stops attackers finding out which usernames exist.`); }
+    };
+  } else if(!done){
+    el.querySelectorAll(".fixes input").forEach(r=>r.onchange=()=>{ const o={}; FIXES.forEach((_,k)=>{ const c=el.querySelector(`input[name=fix${k}]:checked`); if(c) o[k]=c.value; }); S.ui.s4fix=o; save(); });
+    $("#s4b").onclick=()=>{
+      const o=S.ui.s4fix||{}; if(Object.keys(o).length<3){ feedback("info","Choose a fix for all three flaws."); return; }
+      if(check([o[0],o[1],o[2]].join(","),"d0d6d748")) solved(i, `Solved. Hashing means a database leak doesn't reveal passwords. Rate limits and number matching defeat MFA fatigue, because the attacker can't see the number on Dan's screen. Checking permissions on the server stops users from simply claiming to be admins. Hiding or renaming a field changes nothing, because anyone can edit the requests their browser sends.`);
+      else wrong(i, "At least one fix is wrong. For each one, ask whether an attacker could still get round it.");
+    };
+  }
+}
+
+/* =====================================================================
+   STAGE 8: MACHINE LEARNING
+   ===================================================================== */
+// features: [failed sign-in steps (wrong passwords + rejected MFA prompts), hours from the person's usual sign-in time]
+const NORMAL = [[0,.5],[0,1],[1,.5],[0,2],[1,1.5],[0,.2],[2,1],[0,3],[1,2.5],[0,1.2],[3,.8],[1,.3],[0,4],[2,2],[0,.8],[1,3.5],[6,1],[7,.5],[0,9],[0,10],[1,8],[2,6],[4,3],[0,5.5]];
+const ATTACK = [[8,7],[10,9],[9,6],[7,10],[6,8],[10,5],[5,9],[3,6.5]];
+const DATA = [...NORMAL.map(p=>[p[0],p[1],0]), ...ATTACK.map(p=>[p[0],p[1],1])];
+const sig = z => 1/(1+Math.exp(-z));
+let ML = { w:[0,0,0], epoch:0, running:false };
+function prob(p){ return sig(ML.w[0] + ML.w[1]*p[0]/10 + ML.w[2]*p[1]/12); }
+function trainSteps(n){ for(let e=0;e<n;e++){ const g=[0,0,0]; for(const [x,y,l] of DATA){ const p=sig(ML.w[0]+ML.w[1]*x/10+ML.w[2]*y/12)-l; g[0]+=p; g[1]+=p*x/10; g[2]+=p*y/12; } for(let k=0;k<3;k++) ML.w[k]-=0.05*g[k]; ML.epoch++; } }
+function mlStats(t){ let tp=0,fp=0; for(const d of DATA){ const f=prob(d)>=t; if(f&&d[2]) tp++; if(f&&!d[2]) fp++; } return {tp,fp}; }
+function drawPlot(){
+  const c=$("#plot"); if(!c) return;
+  const cs=getComputedStyle(document.documentElement);
+  const col=v=>cs.getPropertyValue(v).trim();
+  const dpr=window.devicePixelRatio||1, W=c.clientWidth, H=Math.round(W*0.72);
+  c.width=W*dpr; c.height=H*dpr; c.style.height=H+"px";
+  const g=c.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  const L=44,R=12,T=12,B=40, pw=W-L-R, ph=H-T-B;
+  const X=v=>L+v/11*pw, Y=v=>T+ph-v/12*ph;
+  g.clearRect(0,0,W,H);
+  const t=(S.ui.s5t||50)/100, trained=ML.epoch>0;
+  // shaded "flagged" region
+  if(trained){
+    g.fillStyle=col("--bad-soft");
+    const step=4;
+    for(let px=0;px<pw;px+=step) for(let py=0;py<ph;py+=step){
+      const fx=px/pw*11, fy=(ph-py)/ph*12;
+      if(prob([fx,fy])>=t) g.fillRect(L+px,T+py,step,step);
+    }
+  }
+  // grid and axes
+  g.strokeStyle=col("--plot-grid"); g.lineWidth=1; g.fillStyle=col("--muted");
+  g.font="11px "+col("--f-mono"); g.textAlign="center"; g.textBaseline="top";
+  for(let v=0;v<=10;v+=2){ g.beginPath(); g.moveTo(X(v),T); g.lineTo(X(v),T+ph); g.stroke(); g.fillText(v,X(v),T+ph+6); }
+  g.textAlign="right"; g.textBaseline="middle";
+  for(let v=0;v<=12;v+=3){ g.beginPath(); g.moveTo(L,Y(v)); g.lineTo(L+pw,Y(v)); g.stroke(); g.fillText(v,L-8,Y(v)); }
+  g.textAlign="center"; g.textBaseline="bottom"; g.font="600 11px "+col("--f-body");
+  g.fillText("Failed sign-in steps (wrong passwords + rejected MFA prompts)", L+pw/2, H-2);
+  g.save(); g.translate(11,T+ph/2); g.rotate(-Math.PI/2); g.textBaseline="top"; g.fillText("Hours from usual sign-in time",0,0); g.restore();
+  // decision boundary: w0 + w1 x/10 + w2 y/12 = logit(t)
+  if(trained && Math.abs(ML.w[2])>1e-6){
+    const lg=Math.log(t/(1-t)); const yAt=x=>(lg-ML.w[0]-ML.w[1]*x/10)*12/ML.w[2];
+    g.save(); g.beginPath(); g.rect(L,T,pw,ph); g.clip();
+    g.strokeStyle=col("--bad"); g.lineWidth=2; g.setLineDash([6,4]);
+    g.beginPath(); g.moveTo(X(0),Y(yAt(0))); g.lineTo(X(11),Y(yAt(11))); g.stroke(); g.restore();
+  }
+  // points
+  for(const d of DATA){
+    const x=X(d[0]), y=Y(d[1]);
+    if(d[2]){ g.strokeStyle=col("--bad"); g.lineWidth=2.5; g.beginPath(); g.moveTo(x-5,y-5); g.lineTo(x+5,y+5); g.moveTo(x+5,y-5); g.lineTo(x-5,y+5); g.stroke(); }
+    else { g.fillStyle=col("--muted"); g.beginPath(); g.arc(x,y,4.5,0,Math.PI*2); g.fill(); }
+    if(trained && prob(d)>=t){ g.strokeStyle=col("--warn"); g.lineWidth=2; g.beginPath(); g.arc(x,y,9,0,Math.PI*2); g.stroke(); }
+  }
+}
+function stage5(el){
+  const i=idx("s8"), st=S.stages[i], ui=S.ui, done=st.status==="done";
+  if(done && ML.epoch===0) trainSteps(2000);
+  const trained = ML.epoch>0, t=(ui.s5t||50)/100;
+  const s = trained ? mlStats(t) : {tp:0,fp:0};
+  const met = trained && s.tp===ATTACK.length && s.fp<=2;
+  const a = ui.s5q || {};
+  el.innerHTML = stageFrame(i,
+    `The security team wants an early-warning system that flags risky sign-ins automatically. You have 32 past sign-ins, each labelled as normal or an attack. Train a model on them (logistic regression), then choose how sure it must be before it raises an alert. Target: catch all 8 attacks while flagging no more than 2 normal sign-ins.`,
+    `<div class="ml">
+      <div class="plotbox">
+        <canvas id="plot" role="img" aria-label="Scatter plot of past sign-ins with the model's decision boundary"></canvas>
+        <div class="keyline"><span><i class="sw c"></i>Normal sign-in</span><span><i class="sw x"></i>Attack</span><span><i class="sw r"></i>Flagged by the model</span></div>
+      </div>
+      <div class="stack">
+        <div class="panel stack">
+          <div class="row" style="justify-content:space-between"><h3>Model</h3><span class="mono small muted" id="epochs">${ML.epoch} training passes</span></div>
+          <button class="btn ${trained?"":"primary"}" id="trainBtn" ${ML.running||trained?"disabled":""}>${trained?"Model trained":"Train the model"}</button>
+          <div class="thr">
+            <label class="label" for="thr">Alert when the model is at least <span id="thrV">${Math.round(t*100)}%</span> sure it's an attack</label>
+            <input type="range" id="thr" min="1" max="99" value="${Math.round(t*100)}" ${trained?"":"disabled"}>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="stat ${trained?(s.tp===8?"good":"badc"):""}"><span class="label">Attacks caught</span><div class="n" id="tp">${trained?s.tp:"–"}/8</div></div>
+          <div class="stat ${trained?(s.fp<=2?"good":"badc"):""}"><span class="label">False alarms</span><div class="n" id="fp">${trained?s.fp:"–"}/24</div></div>
+        </div>
+        <p class="small muted" id="mlmsg">${!trained?"The model starts knowing nothing. Training adjusts its weights to fit the labelled examples.":met?"Target met. Answer the questions below to finish.":"Not there yet. Adjust the threshold."}</p>
       </div>
     </div>
-    <div style="padding:1rem .25rem"><div class="uni-logo" style="width:280px" role="img" aria-label="${esc(CONFIG.university)}, ${esc(CONFIG.department)}"></div></div>
-    </section>
-    <section class="panel stack">
-      <h3>Leaderboard</h3>
-      <form class="row" id="fForm" style="align-items:flex-end">
-        <div style="flex:1;min-width:140px"><label class="label" for="fTeam">Team name</label><input type="text" id="fTeam" maxlength="24" autocomplete="off"></div>
-        <div style="flex:1;min-width:120px"><label class="label" for="fCode">Report code</label><input type="text" id="fCode" maxlength="9" autocomplete="off" spellcheck="false" placeholder="XXXX-XXX" style="font-family:var(--f-mono);text-transform:uppercase"></div>
-        <button class="btn primary" type="submit">Add</button>
-      </form>
-      <div id="fMsg"></div>
-      ${rows.length?`<div class="scroll" style="border:0"><table class="lb"><thead><tr><th>#</th><th>Team</th><th style="text-align:right">Stages</th><th style="text-align:right">Time</th><th style="text-align:right">Score</th><th></th></tr></thead>
-      <tbody>${rows.map((r,k)=>`<tr><td class="num" style="text-align:left">${k+1}</td><td>${esc(r.team)}</td><td class="num">${[...Array(V().stages).keys()].filter(b=>r.mask&(1<<b)).length}/${V().stages}</td><td class="num">${r.minutes} min</td><td class="num">${r.score}</td><td style="text-align:right"><button class="btn ghost" data-del="${esc(r.id)}" aria-label="Remove ${esc(r.team)}">✕</button></td></tr>`).join("")}</tbody></table></div>`:`<p class="small muted">Teams show a seven-character report code when they finish. Enter it here with their team name. Codes include a checksum, so mistyped or made-up codes are rejected.</p>`}
-      ${rows.length?`<div id="clearZone"><button class="btn ghost" id="fClear">Clear leaderboard for the next group</button></div>`:""}
-    </section>
-  </div>`;
-  $("#fStart").onclick=()=>{ if(F.running){ F.remaining=fRemaining(); F.running=false; } else { F.endAt=Date.now()+F.remaining*1000; F.running=true; } saveF(); renderFacilitator(); };
-  $("#app").querySelectorAll("[data-variant]").forEach(b=>b.onclick=()=>{ if(F.running||F.variant===b.dataset.variant) return; F.variant=b.dataset.variant; F.remaining=mins()*60; saveF(); renderFacilitator(); });
-  $("#fAdd").onclick=()=>{ if(F.running) F.endAt+=60000; else F.remaining+=60; saveF(); updClock(); };
-  $("#fReset").onclick=()=>{ F.running=false; F.remaining=mins()*60; saveF(); renderFacilitator(); };
-  $("#fForm").onsubmit=e=>{
-    e.preventDefault();
-    const team=$("#fTeam").value.trim(), r=readCode($("#fCode").value);
-    if(!team){ $("#fMsg").innerHTML=`<div class="feedback info">Enter the team name.</div>`; return; }
-    if(!r){ $("#fMsg").innerHTML=`<div class="feedback bad">That code isn't valid. Check it with the team and try again.</div>`; return; }
-    F.teams=F.teams.filter(t=>t.team.toLowerCase()!==team.toLowerCase());
-    F.teams.push({id:Date.now().toString(36), team, ...r}); saveF(); renderFacilitator();
-    $("#fTeam").focus();
+    <div class="task" id="s5qs" ${met||done?"":"hidden"}>
+      <h3>What did your model teach you?</h3>
+      <div class="stack">
+        <div class="q"><p style="font-weight:600;margin-bottom:.45rem">At the default 50% threshold, which attack did the model miss?</p><div class="radios">
+          ${[["a","The attempt with 10 failed steps, 9 hours outside the usual time"],["b","The one with only 3 failed steps: the phished password plus rejected MFA prompts, like Dan's"],["c","A night-shift worker signing in at an unusual hour"]].map(([v,t])=>`<label class="radio"><input type="radio" name="q5a" id="q5a-${v}" value="${v}" ${(a.a===v)||(done&&v==="b")?"checked":""} ${done?"disabled":""}><span>${t}</span></label>`).join("")}
+        </div></div>
+        <div class="q"><p style="font-weight:600;margin-bottom:.45rem">What happens if the security team sets the threshold close to 1%?</p><div class="radios">
+          ${[["a","The model becomes more accurate overall"],["b","Nothing changes, because the model is already trained"],["c","Every attack is caught, but analysts get so many false alarms they start ignoring them"]].map(([v,t])=>`<label class="radio"><input type="radio" name="q5b" id="q5b-${v}" value="${v}" ${(a.b===v)||(done&&v==="c")?"checked":""} ${done?"disabled":""}><span>${t}</span></label>`).join("")}
+        </div></div>
+      </div>
+      ${!done?`<div class="row" style="margin-top:1rem"><button class="btn primary" id="s5go">Submit answers</button></div>`:""}
+    </div>`);
+  wireFrame(i);
+  requestAnimationFrame(drawPlot);
+  const tb=$("#trainBtn"); if(tb) tb.onclick=()=>{
+    ML.running=true; tb.disabled=true; tb.textContent="Training…";
+    const stepAnim=()=>{ trainSteps(50); $("#epochs").textContent=ML.epoch+" training passes"; drawPlot();
+      if(ML.epoch<2000) requestAnimationFrame(stepAnim); else { ML.running=false; render(); } };
+    requestAnimationFrame(stepAnim);
   };
-  $("#app").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ F.teams=F.teams.filter(t=>t.id!==b.dataset.del); saveF(); renderFacilitator(); });
-  const fc=$("#fClear"); if(fc) fc.onclick=()=>{
-    $("#clearZone").innerHTML=`<span class="confirm">Remove all ${F.teams.length} teams? <button class="btn" id="clrYes">Clear</button><button class="btn ghost" id="clrNo">Cancel</button></span>`;
-    $("#clrYes").onclick=()=>{ F.teams=[]; saveF(); renderFacilitator(); };
-    $("#clrNo").onclick=()=>renderFacilitator();
+  const th=$("#thr"); if(th) th.oninput=e=>{
+    S.ui.s5t=+e.target.value; save();
+    const tt=S.ui.s5t/100, s2=mlStats(tt), ok=s2.tp===8&&s2.fp<=2;
+    $("#thrV").textContent=S.ui.s5t+"%"; $("#tp").textContent=s2.tp+"/8"; $("#fp").textContent=s2.fp+"/24";
+    $("#tp").parentElement.className="stat "+(s2.tp===8?"good":"badc"); $("#fp").parentElement.className="stat "+(s2.fp<=2?"good":"badc");
+    $("#mlmsg").textContent = ok?"Target met. Answer the questions below to finish.":"Not there yet. Adjust the threshold.";
+    if(ok) $("#s5qs").hidden=false;
+    drawPlot();
   };
-  function updClock(){ const c=$("#clock"); if(!c) return; const r=fRemaining(); c.textContent=fmtTime(r*1000); c.classList.toggle("low", r<=300); }
-  clearInterval(fTick); fTick=setInterval(()=>{ updClock(); if(F.running && fRemaining()===0){ F.running=false; F.remaining=0; saveF(); renderFacilitator(); } },500);
-  updClock();
+  el.querySelectorAll("#s5qs input").forEach(r=>r.onchange=()=>{ S.ui.s5q={a:(el.querySelector("input[name=q5a]:checked")||{}).value, b:(el.querySelector("input[name=q5b]:checked")||{}).value}; save(); });
+  const go=$("#s5go"); if(go) go.onclick=()=>{
+    const q=S.ui.s5q||{}; if(!q.a||!q.b){ feedback("info","Answer both questions."); return; }
+    if(check(q.a+"|"+q.b,"7fcef1df")) solved(i, `Solved. The hardest attack to spot looked almost normal because the attacker already had a real password. Machine learning helps, but it is a trade-off: a low threshold floods analysts with alerts (alert fatigue), and a high one misses quiet attacks. That is why detection is combined with prevention, like the fixes from stage ${idx("s5")+1}.`);
+    else wrong(i, "At least one answer is wrong. Try moving the slider back to 50% and to 1% to see for yourself.");
+  };
 }
-renderFacilitator();
+window.addEventListener("resize", ()=>{ if(S.current===idx("s8")) drawPlot(); });
+
+/* =====================================================================
+   INCIDENT REPORT
+   ===================================================================== */
+function renderReport(){
+  finishIfDone();
+  const mins = Math.round(((S.finished||Date.now())-S.started)/60000);
+  const mask = S.stages.reduce((m,s,k)=>m|(s.status==="done"?1<<k:0),0);
+  const code = makeCode(totalScore(), mins, mask);
+  const stageLabel = ids => { const n=ids.map(x=>idx(x)+1).filter(x=>x>0); return n.length>1 ? "Stages "+n.slice(0,-1).join(", ")+" and "+n[n.length-1] : "Stage "+n[0]; };
+  const CAREERS = [
+    [["s1","s9"],"Security awareness and incident management","Understanding how attackers trick people, and leading an organisation's response when they succeed."],
+    [["s2","s3"],"SOC analyst and digital forensics","Watching logs around the clock, spotting intrusions and rebuilding exactly what happened."],
+    [["s4","s6"],"Cryptography and data protection","Designing the maths that keeps data secret and stores passwords safely."],
+    [["s5"],"Secure software engineering","Building systems that are hard to break, and reviewing code for flaws."],
+    [["s7"],"Network engineering","Designing and defending the networks every organisation depends on."],
+    [["s8"],"Machine learning engineer","Training models that detect fraud, malware and attacks at scale."]
+  ].filter(([ids])=>ids.some(x=>idx(x)>=0)).map(([ids,t,d])=>[stageLabel(ids),t,d]);
+  const KIND = ["one","two","three","four","five","six"][CAREERS.length-1];
+  $("#app").innerHTML = `
+  <div class="wrap" style="padding-block:2rem 3rem">
+    <div class="stack" style="gap:.5rem;margin-bottom:1.75rem">
+      <span class="label">INC-2026-1013 · Closed by ${esc(S.team)}</span>
+      <h1>Incident report</h1>
+    </div>
+    <div class="report">
+      <section class="stack">
+        <h2>What happened</h2>
+        <ol class="timeline">
+          <li><span class="when">Mon 07:41</span><br>A phishing email posing as the IT Service Desk arrives from a lookalike domain.</li>
+          <li><span class="when">07:52</span><br>Dan Okafor enters his password on the fake mailbox page.</li>
+          <li><span class="when">08:01 to 08:03</span><br>The attacker signs in from 203.0.113.77 and sends repeated MFA prompts. Dan approves the fourth one.</li>
+          <li><span class="when">08:19</span><br>A hidden mailbox rule diverts invoice emails so Dan won't see replies.</li>
+          ${SHORT ? `<li><span class="when">08:22</span><br>A note left in Drafts reveals a backup account and plans for more fake payments before Friday.</li>`
+                  : `<li><span class="when">08:22 to 08:24</span><br>Two notes left in Drafts reveal a backup account and a second target: Moorside Fuels, this Friday.</li>`}
+          <li><span class="when">08:31</span><br>The attacker creates an admin account, svc_kestrel, through a flaw in the admin code.</li>
+          <li><span class="when">09:02</span><br>Northfield Pallets' bank details are changed, 59 minutes after the attacker first signed in. £48,200 is paid to the attacker.</li>
+        </ol>
+        <h2 style="margin-top:.75rem">Recommendations</h2>
+        <ul style="margin:0;padding-left:1.2rem;display:flex;flex-direction:column;gap:.35rem">
+          <li>Disable svc_kestrel, reset Dan's password, end all his sessions and delete the mailbox rule.</li>
+          <li>Warn the bank ${SHORT?"and check every supplier":"and Moorside Fuels"} before Friday's payment run.</li>
+          <li>Block the attacker addresses, with firewall rules in the right order.</li>
+          <li>Store passwords with a unique salt and a slow password hash, and check admin rights on the server.</li>
+          <li>Rate-limit MFA prompts and require number matching.</li>
+          <li>Phone suppliers on a known number before changing any bank details.</li>
+          <li>Run the new detection model, with a threshold chosen to balance missed attacks against false alarms.</li>
+        </ul>
+      </section>
+      <aside class="stack">
+        <div class="panel stack" style="gap:.6rem">
+          <span class="label">Report code</span>
+          <div class="code-out" id="codeOut">${code}</div>
+          <p class="small muted">Give this code to your facilitator to enter your team on the leaderboard.</p>
+          <div class="row"><button class="btn" id="copyCode">Copy code</button><span class="small muted" id="copied"></span></div>
+        </div>
+        <div class="panel">
+          <table class="scoretable">
+            ${STAGES.map((s,k)=>`<tr><td>${s.title} <span class="muted small">· ${S.stages[k].status==="skipped"?"skipped":S.stages[k].hints+" hint"+(S.stages[k].hints===1?"":"s")+", "+S.stages[k].wrong+" wrong"}</span></td><td>${stageScore(k)}</td></tr>`).join("")}
+            <tr class="total"><td>Total · ${mins} min</td><td>${totalScore()} / ${STAGES.length*100}</td></tr>
+          </table>
+        </div>
+      </aside>
+    </div>
+    <section class="stack" style="margin-top:2.5rem">
+      <h2>You just worked as ${KIND} kinds of specialist</h2>
+      <div class="careers">${CAREERS.map(([s,t,d])=>`<div class="career"><span class="label">${s}</span><b>${t}</b><span class="small muted">${d}</span></div>`).join("")}</div>
+    </section>
+    <section class="panel study" style="margin-top:2rem">
+      <div class="uni-logo" role="img" aria-label="${esc(CONFIG.university)}, ${esc(CONFIG.department)}"></div>
+      <div class="stack" style="gap:.75rem">
+        <h2>Study computing at Bradford</h2>
+        <p class="muted">Everything you did today is part of our degrees. Find the one that fits you.</p>
+        <ul class="courses">${CONFIG.courses.map(c=>`<li>${esc(c)}</li>`).join("")}</ul>
+        <p class="small muted">${esc(CONFIG.openDay)}</p>
+        <div class="row"><a class="btn primary" href="${esc(CONFIG.website)}" target="_blank" rel="noopener">Explore computing courses</a><span class="small muted mono" style="word-break:break-all">${esc(CONFIG.website.replace(/^https?:\/\//,""))}</span></div>
+      </div>
+    </section>
+    <div class="row" style="margin-top:1.5rem;justify-content:space-between">
+      <button class="btn ghost" id="backCase">← Back to the case</button>
+      <span id="resetZone"><button class="btn ghost" id="resetBtn">Start a new team on this device</button></span>
+    </div>
+  </div>`;
+  $("#copyCode").onclick=()=>{
+    const done=()=>{ $("#copied").textContent="Copied"; };
+    if(navigator.clipboard) navigator.clipboard.writeText(code).then(done).catch(()=>selectCode()); else selectCode();
+  };
+  function selectCode(){ const r=document.createRange(); r.selectNodeContents($("#codeOut")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); $("#copied").textContent="Selected. Press Ctrl+C to copy."; }
+  $("#backCase").onclick=()=>{ S.ui.view="case"; save(); render(); };
+  $("#resetBtn").onclick=()=>{
+    $("#resetZone").innerHTML=`<span class="confirm">This clears this team's progress. <button class="btn" id="resetYes">Clear</button><button class="btn ghost" id="resetNo">Cancel</button></span>`;
+    $("#resetYes").onclick=()=>{ store.del(STORE_KEY); S=BLANK(); ML={w:[0,0,0],epoch:0,running:false}; render(); };
+    $("#resetNo").onclick=()=>render();
+  };
+  renderMeta();
+}
+
+render(); if(S.started && !S.finished) startTick();
 </script>
 
 </body>
